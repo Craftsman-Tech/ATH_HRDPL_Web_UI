@@ -20,7 +20,10 @@ import { useTheme, useLang } from '../components/ThemeContext';
 import '../styles/signin.css';
 
 // Role list — order and demo-email mapping matches the original.
+// SuperAdmin is listed first: it's the platform/founder account that approves
+// hospitals and creates each hospital Admin's credentials.
 const ROLES: { id: Role; demoEmail: string }[] = [
+  { id: 'SuperAdmin',   demoEmail: 'superadmin@vexoo.in' },
   { id: 'Admin',        demoEmail: 'admin@vexoo.in'     },
   { id: 'Doctor',       demoEmail: 'doctor@vexoo.in'    },
   { id: 'Receptionist', demoEmail: 'reception@vexoo.in' },
@@ -30,6 +33,7 @@ const ROLES: { id: Role; demoEmail: string }[] = [
 
 // Where each role lands after signing in.
 const ROLE_HOME: Record<Role, string> = {
+  SuperAdmin:   '/super-admin',
   Admin:        '/admin',
   Doctor:       '/doctor',
   Receptionist: '/reception',
@@ -48,6 +52,7 @@ const Icon = ({ d, size = 13 }: { d: string; size?: number }) => (
 
 // SVG paths used in the role buttons (taken from the original mockup).
 const ROLE_ICONS: Record<Role, string> = {
+  SuperAdmin:   'M3 7l4 4 5-7 5 7 4-4v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
   Admin:        'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   Doctor:       'M22 12h-4l-3 9L9 3l-3 9H2',
   Receptionist: 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z',
@@ -229,15 +234,15 @@ export default function SignInScreen() {
           </div>
         </form>
 
-        {/* Footer */}
-        <div style={{ position: 'absolute', bottom: 24, left: 0, right: 0 }}>
-          <div className="form-footer">
-            <span>{t.signIn.newClinic}</span>
-            <span className="sep">·</span>
-            <a href="#">{t.signIn.register}</a>
-            <span className="sep">·</span>
-            <button type="button">{t.signIn.help}</button>
-          </div>
+        {/* Footer — normal document flow (no absolute overlay, so it can never
+            sit on top of the language buttons and swallow their clicks). The
+            .form-panel column layout pins this to the bottom of the panel. */}
+        <div className="form-footer">
+          <span>{t.signIn.newClinic}</span>
+          <span className="sep">·</span>
+          <a href="#">{t.signIn.register}</a>
+          <span className="sep">·</span>
+          <button type="button">{t.signIn.help}</button>
         </div>
       </section>
     </div>

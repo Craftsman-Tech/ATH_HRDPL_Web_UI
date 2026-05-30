@@ -44,6 +44,7 @@ const en = {
     language:   'Language',
   },
   roles: {
+    SuperAdmin:   'Super Admin',
     Admin:        'Admin',
     Doctor:       'Doctor',
     Receptionist: 'Reception',
@@ -108,6 +109,7 @@ const hi: typeof en = {
     language:   'भाषा',
   },
   roles: {
+    SuperAdmin:   'सुपर एडमिन',
     Admin:        'प्रशासक',
     Doctor:       'डॉक्टर',
     Receptionist: 'रिसेप्शन',
@@ -167,6 +169,7 @@ const te: typeof en = {
     language:   'భాష',
   },
   roles: {
+    SuperAdmin:   'సూపర్ అడ్మిన్',
     Admin:        'అడ్మిన్',
     Doctor:       'డాక్టర్',
     Receptionist: 'రిసెప్షన్',

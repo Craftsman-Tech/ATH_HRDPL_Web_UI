@@ -13,7 +13,10 @@
 
 // ─── Roles ──────────────────────────────────────────────────────────────────
 export type Role =
-  | 'Admin'
+  | 'SuperAdmin'     // platform/founder level — Founders' Console; approves
+                     // hospitals and issues each hospital's Admin credentials
+  | 'Admin'          // hospital administrator — signs in with credentials the
+                     // SuperAdmin created; manages a single hospital
   | 'Doctor'
   | 'Receptionist'   // includes Nurse — same portal in current design
   | 'Pharmacist'

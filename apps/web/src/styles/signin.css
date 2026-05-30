@@ -74,8 +74,12 @@
 /* ── RIGHT FORM PANEL ───────────────────────────────────────────────────── */
 .form-panel {
   position: relative;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  flex-direction: column;          /* form stacked above footer */
+  align-items: center;             /* horizontal centering of children */
   padding: 48px;
+  overflow-y: auto;                /* if the panel is shorter than the form,
+                                      scroll instead of overlapping anything */
 }
 
 .theme-toggle {
@@ -89,7 +93,7 @@
 }
 .theme-toggle:hover { color: var(--text); transform: rotate(20deg); }
 
-.form-wrap         { width: 100%; max-width: 420px; }
+.form-wrap         { width: 100%; max-width: 420px; margin-top: auto; margin-bottom: auto; }
 .form-welcome      { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.4px; font-weight: 600; }
 .form-heading      { font-size: 32px; line-height: 1.15; letter-spacing: -0.8px; margin-top: 6px; color: var(--text); }
 .form-sub          { font-size: 14px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
