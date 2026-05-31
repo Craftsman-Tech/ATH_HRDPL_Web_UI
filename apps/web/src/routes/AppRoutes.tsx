@@ -6,23 +6,29 @@
  *  Routes that need a signed-in user are wrapped in <RequireAuth>; routes
  *  that should redirect already-signed-in users (Sign-In) use <RedirectIfAuth>.
  *
- *  Today most portal routes are STUBS — they show a placeholder. They get
- *  filled in during their respective build phases.
- *
- *  Portal status:
- *    /super-admin → Founders' Console (BUILT — the platform/founder portal that
- *                   approves hospitals and issues hospital Admin credentials).
- *    /admin       → Hospital Admin portal (placeholder — built in a later phase;
- *                   this is the account a SuperAdmin creates for each hospital).
- *    others       → placeholders.
+ *  All portals are now fully built:
+ *    /super-admin → Founders' Console      (SuperAdmin)
+ *    /admin       → Hospital Admin         (Admin)
+ *    /doctor      → Doctor Portal          (Doctor)
+ *    /reception   → Nurse/Receptionist     (Receptionist)
+ *    /pharmacy    → Pharmacist Portal      (Pharmacist)
+ *    /lab         → Lab Technician Portal  (LabTech)
+ *    /patient     → Patient Portal         (Patient)
  * ============================================================================
  */
 import { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth }         from '../components/AuthContext';
 import SignInScreen        from '../screens/SignInScreen';
-import AdminScreen         from '../screens/admin/AdminScreen';
-import GenericPlaceholder  from '../screens/placeholders/GenericPlaceholder';
+import AdminScreen            from '../screens/admin/AdminScreen';
+import HospitalAdminScreen    from '../screens/hospital-admin/HospitalAdminScreen';
+import ReceptionScreen        from '../screens/reception/ReceptionScreen';
+import DoctorScreen           from '../screens/doctor/DoctorScreen';
+import PatientScreen          from '../screens/patient/PatientScreen';
+import PharmacistScreen       from '../screens/pharmacist/PharmacistScreen';
+import LabTechScreen          from '../screens/lab-tech/LabTechScreen';
+
+// All portals are now built — GenericPlaceholder is no longer used.
 
 // ─── Route guards ───────────────────────────────────────────────────────────
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -55,8 +61,40 @@ function RedirectIfAuth({ children }: { children: ReactNode }) {
 //  SuperAdminScreen later; routing is what matters and is correct below.)
 function SuperAdminRoute() {
   const { user, signOut } = useAuth();
-  // adminRole is left at its default ("Founder · root") to match the design.
   return <AdminScreen adminName={user?.name} onSignOut={signOut} />;
+}
+
+// Hospital Admin portal — the account a SuperAdmin creates for each hospital.
+// Bridges the signed-in user's name and sign-out into HospitalAdminScreen.
+function HospitalAdminRoute() {
+  const { user, signOut } = useAuth();
+  return <HospitalAdminScreen adminName={user?.name} onSignOut={signOut} />;
+}
+
+// Nurse / Receptionist portal.
+function ReceptionRoute() {
+  const { user, signOut } = useAuth();
+  return <ReceptionScreen nurseName={user?.name} onSignOut={signOut} />;
+}
+
+function DoctorRoute() {
+  const { user, signOut } = useAuth();
+  return <DoctorScreen doctorName={user?.name} onSignOut={signOut} />;
+}
+
+function PatientRoute() {
+  const { user, signOut } = useAuth();
+  return <PatientScreen patientName={user?.name} onSignOut={signOut} />;
+}
+
+function PharmacistRoute() {
+  const { user, signOut } = useAuth();
+  return <PharmacistScreen pharmacistName={user?.name} onSignOut={signOut} />;
+}
+
+function LabTechRoute() {
+  const { user, signOut } = useAuth();
+  return <LabTechScreen techName={user?.name} onSignOut={signOut} />;
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -77,24 +115,24 @@ export default function AppRoutes() {
           <RequireAuth><SuperAdminRoute /></RequireAuth>
         } />
 
-        {/* Hospital Admin — placeholder until its build phase */}
+        {/* Hospital Admin — the account a SuperAdmin creates (BUILT) */}
         <Route path="/admin/*" element={
-          <RequireAuth><GenericPlaceholder portal="Admin" /></RequireAuth>
+          <RequireAuth><HospitalAdminRoute /></RequireAuth>
         } />
         <Route path="/doctor/*" element={
-          <RequireAuth><GenericPlaceholder portal="Doctor" /></RequireAuth>
+          <RequireAuth><DoctorRoute /></RequireAuth>
         } />
         <Route path="/reception/*" element={
-          <RequireAuth><GenericPlaceholder portal="Reception" /></RequireAuth>
+          <RequireAuth><ReceptionRoute /></RequireAuth>
         } />
         <Route path="/pharmacy/*" element={
-          <RequireAuth><GenericPlaceholder portal="Pharmacy" /></RequireAuth>
+          <RequireAuth><PharmacistRoute /></RequireAuth>
         } />
         <Route path="/lab/*" element={
-          <RequireAuth><GenericPlaceholder portal="Lab" /></RequireAuth>
+          <RequireAuth><LabTechRoute /></RequireAuth>
         } />
         <Route path="/patient/*" element={
-          <RequireAuth><GenericPlaceholder portal="Patient" /></RequireAuth>
+          <RequireAuth><PatientRoute /></RequireAuth>
         } />
 
         {/* 404 → Sign-In */}

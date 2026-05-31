@@ -28,6 +28,7 @@ const ROLES: { id: Role; demoEmail: string }[] = [
   { id: 'Doctor',       demoEmail: 'doctor@vexoo.in'    },
   { id: 'Receptionist', demoEmail: 'reception@vexoo.in' },
   { id: 'Pharmacist',   demoEmail: 'pharmacy@vexoo.in'  },
+  { id: 'LabTech',      demoEmail: 'lab@vexoo.in'       },
   { id: 'Patient',      demoEmail: 'patient@vexoo.in'   },
 ];
 
