@@ -1,0 +1,183 @@
+/* ============================================================================
+   SIGN-IN SCREEN — Vexoo Web
+   ----------------------------------------------------------------------------
+   Faithfully reproduces the two-panel layout from the original HTML mockup:
+     - LEFT  : brand panel (deep ink with soft orbs, hero copy, stats)
+     - RIGHT : form panel (role picker, email, password, language switcher)
+
+   On screens < 920px, the left brand panel collapses to a thin top header so
+   the form gets the full viewport — same behavior as the original.
+   ========================================================================== */
+
+.signin-shell {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* ── LEFT BRAND PANEL ───────────────────────────────────────────────────── */
+.brand-panel {
+  position: relative;
+  background: linear-gradient(135deg, #1c2537 0%, #253048 100%);
+  color: #fafaf7;
+  padding: 56px 64px 40px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Soft glowing orbs that give the dark panel its calm depth */
+.orb-1, .orb-2 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.orb-1 { width: 420px; height: 420px; background: rgba(13, 148, 136, 0.25); top: -120px; right: -120px; }
+.orb-2 { width: 320px; height: 320px; background: rgba(91, 212, 188, 0.18); bottom: -80px; left: -80px; }
+
+.brand-inner       { position: relative; z-index: 1; }
+.brand-logo        { display: flex; align-items: center; gap: 14px; }
+.brand-logo-mark   {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-logo-text   { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+.brand-logo-sub    { font-size: 11px; color: rgba(250, 250, 247, 0.55); margin-top: 1px; }
+
+.brand-copy        { margin-top: auto; padding: 32px 0; max-width: 480px; }
+.brand-eyebrow     {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; color: rgba(250, 250, 247, 0.65);
+  text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;
+}
+.brand-eyebrow-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #5bd4bc;
+  box-shadow: 0 0 12px #5bd4bc;
+}
+.brand-headline    { font-size: 56px; line-height: 1.05; letter-spacing: -1.5px; margin: 18px 0 14px; }
+.brand-headline em { font-style: italic; color: #5bd4bc; font-weight: 400; }
+.brand-desc        { font-size: 15px; line-height: 1.65; color: rgba(250, 250, 247, 0.7); max-width: 420px; }
+
+.brand-stats       { display: flex; gap: 36px; margin-top: 36px; padding-top: 28px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.brand-stat        { }
+.brand-stat-val    { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 500; color: #fafaf7; }
+.brand-stat-label  { font-size: 11px; color: rgba(250, 250, 247, 0.5); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+.brand-footer      {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; color: rgba(250, 250, 247, 0.45); padding-top: 24px;
+}
+
+/* ── RIGHT FORM PANEL ───────────────────────────────────────────────────── */
+.form-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;          /* form stacked above footer */
+  align-items: center;             /* horizontal centering of children */
+  padding: 48px;
+  overflow-y: auto;                /* if the panel is shorter than the form,
+                                      scroll instead of overlapping anything */
+}
+
+.theme-toggle {
+  position: absolute; top: 28px; right: 28px;
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.theme-toggle:hover { color: var(--text); transform: rotate(20deg); }
+
+.form-wrap         { width: 100%; max-width: 420px; margin-top: auto; margin-bottom: auto; }
+.form-welcome      { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.4px; font-weight: 600; }
+.form-heading      { font-size: 32px; line-height: 1.15; letter-spacing: -0.8px; margin-top: 6px; color: var(--text); }
+.form-sub          { font-size: 14px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+
+.field-label       { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+
+/* Role picker — 3-column grid, active role gets a colored accent */
+.role-picker {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+.role-btn {
+  padding: 12px 8px; border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  transition: all 0.13s;
+}
+.role-btn:hover { border-color: var(--primary); color: var(--text); }
+.role-btn.active {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.role-btn.active[data-role="Admin"]        { background:#0E7C66; border-color:#0E7C66; }
+.role-btn.active[data-role="Doctor"]       { background:#0A7A8F; border-color:#0A7A8F; }
+.role-btn.active[data-role="Receptionist"] { background:#0E7C66; border-color:#0E7C66; }
+.role-btn.active[data-role="Pharmacist"]   { background:#5C6BC0; border-color:#5C6BC0; }
+.role-btn.active[data-role="Patient"]      { background:#2A7A4B; border-color:#2A7A4B; }
+
+/* Inputs */
+.input-group       { margin-top: 18px; position: relative; }
+.input-row         { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.input-row a       { font-size: 12px; color: var(--primary); text-decoration: none; }
+.input             {
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border); font-size: 14px; color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus       { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+/* Submit button */
+.submit-btn {
+  width: 100%; margin-top: 24px; padding: 13px;
+  background: var(--text); color: var(--bg);
+  border-radius: 10px; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.submit-btn:hover         { transform: translateY(-1px); }
+.submit-btn:disabled      { opacity: 0.6; cursor: not-allowed; transform: none; }
+.submit-btn .spinner      {
+  width: 14px; height: 14px; border: 2px solid currentColor;
+  border-right-color: transparent; border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.demo-note         { margin-top: 16px; font-size: 12px; color: var(--text-muted); text-align: center; }
+.error-note        { margin-top: 12px; font-size: 13px; color: #e11d48; text-align: center; }
+
+/* Language switcher */
+.lang-row          {
+  display: flex; align-items: center; gap: 8px; margin-top: 28px; padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.lang-label        { font-size: 12px; color: var(--text-muted); margin-right: auto; }
+.lang-btn          {
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: transparent;
+  font-size: 12px; color: var(--text-muted); transition: all 0.13s;
+}
+.lang-btn.active   { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.form-footer       {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 32px; font-size: 12px; color: var(--text-muted);
+}
+.form-footer a, .form-footer button { color: var(--primary); text-decoration: none; }
+.form-footer .sep  { color: var(--text-muted); }
+
+/* Mobile-narrow web: collapse the brand panel to a slim header */
+@media (max-width: 920px) {
+  .signin-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .brand-panel  { padding: 24px 28px; min-height: auto; }
+  .brand-copy, .brand-stats, .brand-footer { display: none; }
+  .form-panel   { padding: 32px 24px; }
+}
