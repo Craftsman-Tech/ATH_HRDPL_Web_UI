@@ -3,7 +3,6 @@
  *  ReceptionScreen.tsx — Nurse / Receptionist Portal
  * ============================================================================
  *  Dark-themed portal for front-desk reception and ward nursing staff.
- *  Faithfully ported from Vexoo_Nurse_Receptionist.html reference design.
  *
  *  Tabs (7):
  *    Patient Check-In · Appointments · Vitals Monitor · Care Plans
@@ -12,13 +11,10 @@
  *  Route:           /reception  (protected, role === 'Receptionist')
  *  Suggested path:  apps/web/src/screens/reception/ReceptionScreen.tsx
  *
- *  Props:
- *    nurseName?  — from AuthContext (e.g. "Maria Lopez")
- *    onSignOut?  — called when Logout is clicked
- *
- *  Aesthetic: dark navy (#0f1629), pink accent (#ec4899 / #f472b6),
- *             glassmorphism panels, subtle grid + radial gradient overlays,
- *             Plus Jakarta Sans typeface.
+ *  FIX (May 2026):
+ *  - Header now shows profile avatar (top-right) with hover tooltip
+ *  - Tooltip shows user name, role, and sign-out button
+ *  - Single logout only in sidebar — no duplicate in header
  * ============================================================================
  */
 
@@ -41,8 +37,7 @@ interface Appointment {
   time: string; patient: string; detail: string; status: ChipVariant; dotColor: string;
 }
 interface VitalsPatient {
-  name: string; room: string; doctor: string; recorded: string;
-  status: ChipVariant;
+  name: string; room: string; doctor: string; recorded: string; status: ChipVariant;
   bp: { val: string; trend: string; color: string };
   hr: { val: string; trend: string; color: string };
   spo2: { val: string; trend: string; color: string };
@@ -54,8 +49,7 @@ interface CarePlan {
   status: ChipVariant; avatarColor: string;
 }
 interface Task {
-  id: number; text: string; dueTime: string; priority: Priority; done: boolean;
-  patient?: string;
+  id: number; text: string; dueTime: string; priority: Priority; done: boolean; patient?: string;
 }
 interface HandoverNote {
   initials: string; author: string; when: string; text: string;
@@ -64,6 +58,11 @@ interface BedSlot {
   id: string; label: string; patient?: string; doctor?: string;
   status?: ChipVariant; statusLabel?: string;
   color: string; borderColor: string; available?: boolean;
+}
+
+interface ReceptionScreenProps {
+  nurseName?: string;
+  onSignOut?: () => void;
 }
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
@@ -80,8 +79,6 @@ const CSS = `
   display: flex;
   position: relative;
 }
-
-/* ── Background effects ── */
 .nr-root::before {
   content: '';
   position: fixed; inset: 0;
@@ -99,13 +96,10 @@ const CSS = `
   background-size: 40px 40px;
   pointer-events: none; z-index: 0;
 }
-
-/* ── Scrollbars ── */
 .nr-root ::-webkit-scrollbar { width: 6px; }
 .nr-root ::-webkit-scrollbar-track { background: transparent; }
 .nr-root ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 
-/* ── Animations ── */
 @keyframes nr-fade-up  { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 @keyframes nr-slide-in { from { opacity:0; transform:translateX(-12px); } to { opacity:1; transform:translateX(0); } }
 @keyframes nr-pulse    { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
@@ -163,7 +157,6 @@ const CSS = `
 }
 .nr-nav-item:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.85); }
 .nr-nav-item.active { background: rgba(236,72,153,0.15); color: #f9a8d4; }
-.nr-nav-item.active svg { color: #f472b6; }
 .nr-nav-badge {
   margin-left: auto; background: #f472b6; color: #0f1629;
   font-size: 10px; font-weight: 800;
@@ -171,6 +164,8 @@ const CSS = `
 }
 .nr-nav-badge.warn   { background: #fbbf24; }
 .nr-nav-badge.danger { background: #f87171; }
+
+/* ── Sidebar footer — single logout button ── */
 .nr-sidebar-footer {
   margin-top: auto; padding: 14px 16px 0;
   border-top: 1px solid rgba(255,255,255,0.06);
@@ -182,12 +177,10 @@ const CSS = `
   color: rgba(255,255,255,0.45); font-size: 12.5px; font-weight: 600;
   cursor: pointer; transition: all 0.15s; font-family: inherit;
 }
-.nr-logout-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
+.nr-logout-btn:hover { background: rgba(225,29,72,0.12); color: #f87171; border-color: rgba(225,29,72,0.25); }
 
 /* mobile overlay */
-.nr-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9;
-}
+.nr-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9; }
 .nr-overlay.open { display: block; }
 .nr-hamburger {
   display: none; background: none; border: none;
@@ -217,6 +210,35 @@ const CSS = `
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px; padding: 7px 12px;
 }
+
+/* ── Header profile avatar with hover tooltip ── */
+.nr-header-profile { position: relative; cursor: pointer; }
+.nr-header-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, #ec4899, #be185d);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px; flex-shrink: 0;
+  cursor: pointer; transition: box-shadow 0.15s;
+}
+.nr-header-avatar:hover { box-shadow: 0 0 0 3px rgba(236,72,153,0.35); }
+.nr-profile-tooltip {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0;
+  background: rgba(15,22,41,0.98); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px; padding: 14px 16px; min-width: 200px; z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  backdrop-filter: blur(12px);
+}
+.nr-header-profile:hover .nr-profile-tooltip { display: block; }
+.nr-profile-tooltip-name { font-size: 14px; font-weight: 700; color: white; }
+.nr-profile-tooltip-role { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+.nr-profile-tooltip-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 10px 0; }
+.nr-profile-tooltip-signout {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 7px 10px; border-radius: 8px; border: none; background: transparent;
+  color: #f87171; font-size: 13px; font-weight: 500; cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.13s;
+}
+.nr-profile-tooltip-signout:hover { background: rgba(225,29,72,0.15); }
 
 /* ── Buttons ── */
 .nr-btn {
@@ -271,10 +293,7 @@ const CSS = `
 .nr-panel-body  { padding: 16px 20px; }
 
 /* ── Status chips ── */
-.nr-chip {
-  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
-  white-space: nowrap; flex-shrink: 0;
-}
+.nr-chip { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .nr-chip-waiting   { background: rgba(251,191,36,0.15);  color: #fbbf24; }
 .nr-chip-checkedin { background: rgba(74,222,128,0.15);  color: #4ade80; }
 .nr-chip-progress  { background: rgba(96,165,250,0.15);  color: #60a5fa; }
@@ -288,54 +307,30 @@ const CSS = `
   padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .nr-queue-row:last-child { border-bottom: none; }
-.nr-q-avatar {
-  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700;
-}
+.nr-q-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
 .nr-q-name { font-size: 13.5px; font-weight: 600; }
 .nr-q-meta { font-size: 11.5px; color: rgba(255,255,255,0.4); margin-top: 1px; }
 
 /* ── Appointment rows ── */
-.nr-appt-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
-}
+.nr-appt-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .nr-appt-row:last-child { border-bottom: none; }
-.nr-appt-time {
-  width: 52px; text-align: center; flex-shrink: 0;
-  font-size: 12px; font-weight: 700; color: #f9a8d4;
-  background: rgba(236,72,153,0.1); border-radius: 8px; padding: 5px 4px;
-}
+.nr-appt-time { width: 52px; text-align: center; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #f9a8d4; background: rgba(236,72,153,0.1); border-radius: 8px; padding: 5px 4px; }
 .nr-appt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .nr-appt-patient { font-size: 13px; font-weight: 600; }
 .nr-appt-detail  { font-size: 11.5px; color: rgba(255,255,255,0.4); margin-top: 1px; }
 
 /* ── Vitals ── */
-.nr-vitals-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-}
-.nr-vital-box {
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 12px; padding: 14px;
-}
+.nr-vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.nr-vital-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 14px; }
 .nr-vital-label { font-size: 10.5px; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .nr-vital-val   { font-size: 20px; font-weight: 800; }
 .nr-vital-unit  { font-size: 12px; color: rgba(255,255,255,0.4); margin-left: 3px; }
 .nr-vital-trend { font-size: 11px; margin-top: 3px; }
 
 /* ── Task rows ── */
-.nr-task-row {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
-}
+.nr-task-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .nr-task-row:last-child { border-bottom: none; }
-.nr-task-check {
-  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; margin-top: 1px;
-  border: 1.5px solid rgba(255,255,255,0.2); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s; background: transparent;
-}
+.nr-task-check { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; margin-top: 1px; border: 1.5px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; background: transparent; }
 .nr-task-check.done { background: #f472b6; border-color: #f472b6; }
 .nr-task-text { font-size: 13px; font-weight: 500; flex: 1; }
 .nr-task-text.done { text-decoration: line-through; color: rgba(255,255,255,0.3); }
@@ -347,21 +342,13 @@ const CSS = `
 .nr-prio-done { background: rgba(74,222,128,0.12);  color: #4ade80; }
 
 /* ── Handover notes ── */
-.nr-note-card {
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
-}
+.nr-note-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
 .nr-note-card:last-child { margin-bottom: 0; }
 .nr-note-meta   { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
 .nr-note-author { font-size: 12px; font-weight: 700; }
 .nr-note-when   { font-size: 11px; color: rgba(255,255,255,0.35); }
 .nr-note-text   { font-size: 13px; color: rgba(255,255,255,0.65); line-height: 1.6; }
-.nr-note-avatar {
-  width: 24px; height: 24px; border-radius: 50%;
-  background: linear-gradient(135deg,rgba(236,72,153,0.4),rgba(236,72,153,0.15));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; color: #f472b6; flex-shrink: 0;
-}
+.nr-note-avatar { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg,rgba(236,72,153,0.4),rgba(236,72,153,0.15)); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #f472b6; flex-shrink: 0; }
 
 /* ── Forms ── */
 .nr-form-field  { margin-bottom: 14px; }
@@ -372,9 +359,7 @@ const CSS = `
   color: white; font-family: inherit; font-size: 13.5px; outline: none;
   transition: border-color 0.15s;
 }
-.nr-form-input:focus, .nr-form-select:focus, .nr-form-textarea:focus {
-  border-color: rgba(236,72,153,0.5);
-}
+.nr-form-input:focus, .nr-form-select:focus, .nr-form-textarea:focus { border-color: rgba(236,72,153,0.5); }
 .nr-form-input::placeholder, .nr-form-textarea::placeholder { color: rgba(255,255,255,0.25); }
 .nr-form-select { appearance: none; cursor: pointer; }
 .nr-form-select option { background: #1a2440; }
@@ -399,10 +384,7 @@ const CSS = `
 
 /* ── Responsive ── */
 @media (max-width: 1080px) {
-  .nr-sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 20;
-    transform: translateX(-100%);
-  }
+  .nr-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 20; transform: translateX(-100%); }
   .nr-sidebar.mobile-open { transform: translateX(0); }
   .nr-hamburger { display: flex !important; }
   .nr-topbar { padding: 14px 16px; }
@@ -411,7 +393,6 @@ const CSS = `
 @media (max-width: 760px) {
   .nr-content { padding: 16px; }
   .nr-stats-row { grid-template-columns: repeat(2, 1fr); }
-  .nr-stats-4col { grid-template-columns: repeat(2, 1fr) !important; }
   .nr-two-col   { grid-template-columns: 1fr !important; }
   .nr-three-col { grid-template-columns: 1fr !important; }
   .nr-bed-grid  { grid-template-columns: repeat(2, 1fr); }
@@ -422,82 +403,70 @@ const CSS = `
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const QUEUE: QueuePatient[] = [
-  { id:'MK', initials:'MK', name:'Mohammed Khan',  meta:'Waiting 28 min · Dr. Patel · Cardiology', status:'urgent',    avatarColor:'rgba(248,113,113,0.15)', },
-  { id:'AL', initials:'AL', name:'Anna Lindqvist',  meta:'Waiting 21 min · Dr. Chen · General',    status:'waiting',   avatarColor:'rgba(251,191,36,0.15)',  },
-  { id:'RB', initials:'RB', name:'Robert Baines',   meta:'Arrived 09:30 · Dr. Osei · Ortho',       status:'checkedin', avatarColor:'rgba(74,222,128,0.15)', },
-  { id:'YM', initials:'YM', name:'Yuki Matsuda',    meta:'With doctor · Dr. Chen · Room 4',         status:'progress',  avatarColor:'rgba(96,165,250,0.15)', },
-  { id:'FN', initials:'FN', name:'Fatima Nour',     meta:'Waiting 9 min · Dr. Patel · Follow-up',  status:'waiting',   avatarColor:'rgba(196,132,252,0.15)',},
-  { id:'JT', initials:'JT', name:'James Thornton',  meta:'Waiting 5 min · Dr. Osei · Wellness',    status:'waiting',   avatarColor:'rgba(251,191,36,0.15)', },
-  { id:'PR', initials:'PR', name:'Priya Rao',       meta:'Tests ready · Room 2 · Post-consult',     status:'ready',     avatarColor:'rgba(196,132,252,0.15)',},
+  { id:'MK', initials:'MK', name:'Mohammed Khan',  meta:'Waiting 28 min · Dr. Patel · Cardiology', status:'urgent',    avatarColor:'rgba(248,113,113,0.15)' },
+  { id:'AL', initials:'AL', name:'Anna Lindqvist',  meta:'Waiting 21 min · Dr. Chen · General',    status:'waiting',   avatarColor:'rgba(251,191,36,0.15)'  },
+  { id:'RB', initials:'RB', name:'Robert Baines',   meta:'Arrived 09:30 · Dr. Osei · Ortho',       status:'checkedin', avatarColor:'rgba(74,222,128,0.15)'  },
+  { id:'YM', initials:'YM', name:'Yuki Matsuda',    meta:'With doctor · Dr. Chen · Room 4',         status:'progress',  avatarColor:'rgba(96,165,250,0.15)'  },
+  { id:'FN', initials:'FN', name:'Fatima Nour',     meta:'Waiting 9 min · Dr. Patel · Follow-up',  status:'waiting',   avatarColor:'rgba(196,132,252,0.15)' },
+  { id:'JT', initials:'JT', name:'James Thornton',  meta:'Waiting 5 min · Dr. Osei · Wellness',    status:'waiting',   avatarColor:'rgba(251,191,36,0.15)'  },
+  { id:'PR', initials:'PR', name:'Priya Rao',       meta:'Tests ready · Room 2 · Post-consult',     status:'ready',     avatarColor:'rgba(196,132,252,0.15)' },
 ];
 
 const APPOINTMENTS: Appointment[] = [
-  { time:'08:00', patient:'Robert Baines',   detail:'Dr. Osei · Ortho · Room 3 · 30 min',          status:'checkedin', dotColor:'#4ade80'  },
-  { time:'08:30', patient:'Yuki Matsuda',    detail:'Dr. Chen · General · Room 4 · 20 min',         status:'progress',  dotColor:'#60a5fa'  },
-  { time:'09:00', patient:'Mohammed Khan',   detail:'Dr. Patel · Cardiology · Room 1 · 45 min',     status:'urgent',    dotColor:'#f87171'  },
-  { time:'09:15', patient:'Anna Lindqvist',  detail:'Dr. Chen · General · Room 4 · 20 min',         status:'waiting',   dotColor:'#fbbf24'  },
-  { time:'09:30', patient:'Fatima Nour',     detail:'Dr. Patel · Follow-up · Room 1 · 15 min',      status:'waiting',   dotColor:'#fbbf24'  },
-  { time:'10:00', patient:'James Thornton',  detail:'Dr. Osei · Wellness · Room 3 · 30 min',        status:'checkedin', dotColor:'#c084fc'  },
-  { time:'10:30', patient:'Clare Hutchins',  detail:'Dr. Williams · Neurology · Room 2 · 60 min',   status:'upcoming',  dotColor:'#94a3b8'  },
-  { time:'11:00', patient:'David Okafor',    detail:'Dr. Patel · Cardio review · Room 1 · 30 min',  status:'upcoming',  dotColor:'#94a3b8'  },
+  { time:'08:00', patient:'Robert Baines',   detail:'Dr. Osei · Ortho · Room 3 · 30 min',        status:'checkedin', dotColor:'#4ade80' },
+  { time:'08:30', patient:'Yuki Matsuda',    detail:'Dr. Chen · General · Room 4 · 20 min',       status:'progress',  dotColor:'#60a5fa' },
+  { time:'09:00', patient:'Mohammed Khan',   detail:'Dr. Patel · Cardiology · Room 1 · 45 min',   status:'urgent',    dotColor:'#f87171' },
+  { time:'09:15', patient:'Anna Lindqvist',  detail:'Dr. Chen · General · Room 4 · 20 min',       status:'waiting',   dotColor:'#fbbf24' },
+  { time:'09:30', patient:'Fatima Nour',     detail:'Dr. Patel · Follow-up · Room 1 · 15 min',    status:'waiting',   dotColor:'#fbbf24' },
+  { time:'10:00', patient:'James Thornton',  detail:'Dr. Osei · Wellness · Room 3 · 30 min',      status:'checkedin', dotColor:'#c084fc' },
+  { time:'10:30', patient:'Clare Hutchins',  detail:'Dr. Williams · Neurology · Room 2 · 60 min', status:'upcoming',  dotColor:'#94a3b8' },
+  { time:'11:00', patient:'David Okafor',    detail:'Dr. Patel · Cardio review · Room 1 · 30 min',status:'upcoming',  dotColor:'#94a3b8' },
 ];
 
 const VITALS_PATIENTS: VitalsPatient[] = [
-  {
-    name:'Mohammed Khan', room:'Room 1', doctor:'Dr. Patel', recorded:'09:40', status:'urgent',
-    bp:   { val:'158/94', trend:'↑ High',    color:'#f87171' },
-    hr:   { val:'96',     trend:'↑ Elevated',color:'#fbbf24' },
-    spo2: { val:'97',     trend:'✓ Normal',  color:'#4ade80' },
-    temp: { val:'37.1',   trend:'✓ Normal',  color:'#4ade80' },
-    rr:6, pain:6,
-  },
-  {
-    name:'Yuki Matsuda', room:'Room 4', doctor:'Dr. Chen', recorded:'09:25', status:'progress',
-    bp:   { val:'118/76', trend:'✓ Normal', color:'#4ade80' },
-    hr:   { val:'72',     trend:'✓ Normal', color:'#4ade80' },
-    spo2: { val:'99',     trend:'✓ Normal', color:'#4ade80' },
-    temp: { val:'36.8',   trend:'✓ Normal', color:'#4ade80' },
-    rr:16, pain:2,
-  },
-  {
-    name:'Robert Baines', room:'Room 3', doctor:'Dr. Osei', recorded:'08:05', status:'checkedin',
-    bp:   { val:'122/80', trend:'✓ Normal', color:'#4ade80' },
-    hr:   { val:'68',     trend:'✓ Normal', color:'#4ade80' },
-    spo2: { val:'98',     trend:'✓ Normal', color:'#4ade80' },
-    temp: { val:'37.8',   trend:'↑ Slight', color:'#fbbf24' },
-    rr:17, pain:3,
-  },
+  { name:'Mohammed Khan', room:'Room 1', doctor:'Dr. Patel', recorded:'09:40', status:'urgent',
+    bp:{ val:'158/94', trend:'↑ High',    color:'#f87171' }, hr:{ val:'96', trend:'↑ Elevated', color:'#fbbf24' },
+    spo2:{ val:'97', trend:'✓ Normal', color:'#4ade80' }, temp:{ val:'37.1', trend:'✓ Normal', color:'#4ade80' }, rr:6, pain:6 },
+  { name:'Yuki Matsuda', room:'Room 4', doctor:'Dr. Chen', recorded:'09:25', status:'progress',
+    bp:{ val:'118/76', trend:'✓ Normal', color:'#4ade80' }, hr:{ val:'72', trend:'✓ Normal', color:'#4ade80' },
+    spo2:{ val:'99', trend:'✓ Normal', color:'#4ade80' }, temp:{ val:'36.8', trend:'✓ Normal', color:'#4ade80' }, rr:16, pain:2 },
+  { name:'Robert Baines', room:'Room 3', doctor:'Dr. Osei', recorded:'08:05', status:'checkedin',
+    bp:{ val:'122/80', trend:'✓ Normal', color:'#4ade80' }, hr:{ val:'68', trend:'✓ Normal', color:'#4ade80' },
+    spo2:{ val:'98', trend:'✓ Normal', color:'#4ade80' }, temp:{ val:'37.8', trend:'↑ Slight', color:'#fbbf24' }, rr:17, pain:3 },
 ];
 
-const CARE_PLANS: CarePlan[] = [
-  { initials:'MK', name:'Mohammed Khan', plan:'Hypertension management · Started Apr 28', status:'urgent',    avatarColor:'rgba(248,113,113,0.15)', },
-  { initials:'YM', name:'Yuki Matsuda',  plan:'Post-op recovery · Started May 1',          status:'progress',  avatarColor:'rgba(96,165,250,0.15)', },
-  { initials:'RB', name:'Robert Baines', plan:'Fracture rehabilitation · Started Apr 20',  status:'checkedin', avatarColor:'rgba(74,222,128,0.15)', },
-  { initials:'FN', name:'Fatima Nour',   plan:'Diabetes monitoring · Started Apr 10',      status:'checkedin', avatarColor:'rgba(196,132,252,0.15)',},
+const CARE_PLANS: { initials:string; name:string; plan:string; status:ChipVariant; avatarColor:string }[] = [
+  { initials:'MK', name:'Mohammed Khan', plan:'Hypertension management · Started Apr 28', status:'urgent',    avatarColor:'rgba(248,113,113,0.15)' },
+  { initials:'YM', name:'Yuki Matsuda',  plan:'Post-op recovery · Started May 1',         status:'progress',  avatarColor:'rgba(96,165,250,0.15)' },
+  { initials:'RB', name:'Robert Baines', plan:'Fracture rehabilitation · Started Apr 20', status:'checkedin', avatarColor:'rgba(74,222,128,0.15)' },
+  { initials:'FN', name:'Fatima Nour',   plan:'Diabetes monitoring · Started Apr 10',     status:'checkedin', avatarColor:'rgba(196,132,252,0.15)' },
 ];
 
 const HANDOVER_NOTES: HandoverNote[] = [
-  { initials:'TJ', author:'Nurse T. James', when:'07:45 AM · Night → Morning handover', text:"Mohammed Khan (Room 1) had an elevated BP reading at 3am — 162/96. Dr. Patel was notified and ordered an extra dose of Amlodipine. Patient is resting but needs close monitoring this morning. BP cuff alert set for every 30 mins." },
-  { initials:'TJ', author:'Nurse T. James', when:'07:50 AM · Ward update',               text:"Yuki Matsuda (Room 4) post-op dressing changed at 06:00. No signs of infection. Drain output was 15ml overnight — within expected range. Next dressing review due at noon." },
-  { initials:'TJ', author:'Nurse T. James', when:'07:55 AM · General note',              text:"Crash trolley in Bay B was restocked at 05:30 and checked by on-call doctor. Defibrillator pads replaced. Equipment checklist signed and filed." },
+  { initials:'TJ', author:'Nurse T. James', when:'07:45 AM · Night → Morning handover',
+    text:"Mohammed Khan (Room 1) had an elevated BP reading at 3am — 162/96. Dr. Patel was notified and ordered an extra dose of Amlodipine. Patient is resting but needs close monitoring this morning." },
+  { initials:'TJ', author:'Nurse T. James', when:'07:50 AM · Ward update',
+    text:"Yuki Matsuda (Room 4) post-op dressing changed at 06:00. No signs of infection. Drain output was 15ml overnight — within expected range. Next dressing review due at noon." },
+  { initials:'TJ', author:'Nurse T. James', when:'07:55 AM · General note',
+    text:"Crash trolley in Bay B was restocked at 05:30 and checked by on-call doctor. Defibrillator pads replaced. Equipment checklist signed and filed." },
 ];
 
 const INITIAL_TASKS: Task[] = [
-  { id:1, text:'Re-check BP — Mohammed Khan (Room 1)',            dueTime:'Due: 10:00 AM', priority:'high', done:false, patient:'Mohammed Khan'  },
-  { id:2, text:'Midday dressing change — Yuki Matsuda (Room 4)',  dueTime:'Due: 12:00 PM', priority:'high', done:false, patient:'Yuki Matsuda'   },
-  { id:3, text:'Confirm lab results for Robert Baines',           dueTime:'Due: 11:00 AM', priority:'med',  done:false, patient:'Robert Baines'  },
-  { id:4, text:'Remind Fatima Nour to complete glucose log',      dueTime:'Due: 10:30 AM', priority:'med',  done:false, patient:'Fatima Nour'    },
-  { id:5, text:'Morning vitals round complete',                   dueTime:'Done: 08:45 AM',priority:'low',  done:true  },
-  { id:6, text:'Handover notes reviewed',                         dueTime:'Done: 08:00 AM',priority:'low',  done:true  },
+  { id:1, text:'Re-check BP — Mohammed Khan (Room 1)',           dueTime:'Due: 10:00 AM', priority:'high', done:false },
+  { id:2, text:'Midday dressing change — Yuki Matsuda (Room 4)',dueTime:'Due: 12:00 PM', priority:'high', done:false },
+  { id:3, text:'Confirm lab results for Robert Baines',         dueTime:'Due: 11:00 AM', priority:'med',  done:false },
+  { id:4, text:'Remind Fatima Nour to complete glucose log',    dueTime:'Due: 10:30 AM', priority:'med',  done:false },
+  { id:5, text:'Morning vitals round complete',                  dueTime:'Done: 08:45 AM',priority:'low',  done:true  },
+  { id:6, text:'Handover notes reviewed',                        dueTime:'Done: 08:00 AM',priority:'low',  done:true  },
 ];
 
 const BEDS: BedSlot[] = [
   { id:'r1', label:'ROOM 1', patient:'Mohammed Khan', doctor:'Dr. Patel · Cardiology', status:'urgent',    statusLabel:'URGENT — BP High', color:'rgba(248,113,113,0.08)', borderColor:'rgba(248,113,113,0.2)' },
-  { id:'r2', label:'ROOM 2', patient:'Clare Hutchins', doctor:'Dr. Williams · Neurology', status:'progress', statusLabel:'Awaiting Scan',   color:'rgba(96,165,250,0.08)',  borderColor:'rgba(96,165,250,0.2)'  },
-  { id:'r3', label:'ROOM 3', patient:'Robert Baines', doctor:'Dr. Osei · Orthopaedics', status:'checkedin', statusLabel:'Stable',          color:'rgba(74,222,128,0.08)',  borderColor:'rgba(74,222,128,0.2)'  },
-  { id:'r4', label:'ROOM 4', patient:'Yuki Matsuda',  doctor:'Dr. Chen · Post-Op',      status:'progress',  statusLabel:'In Consult',      color:'rgba(96,165,250,0.08)',  borderColor:'rgba(96,165,250,0.2)'  },
-  { id:'ba', label:'BAY A',  patient:'Fatima Nour',   doctor:'Dr. Patel · Follow-Up',   status:'waiting',   statusLabel:'Waiting Rx',      color:'rgba(196,132,252,0.08)',  borderColor:'rgba(196,132,252,0.2)'},
-  { id:'bb', label:'BAY B',  patient:'James Thornton',doctor:'Dr. Osei · Wellness',     status:'checkedin', statusLabel:'Checked In',      color:'rgba(251,191,36,0.08)',  borderColor:'rgba(251,191,36,0.2)'  },
+  { id:'r2', label:'ROOM 2', patient:'Clare Hutchins', doctor:'Dr. Williams · Neurology', status:'progress', statusLabel:'Awaiting Scan',  color:'rgba(96,165,250,0.08)',  borderColor:'rgba(96,165,250,0.2)' },
+  { id:'r3', label:'ROOM 3', patient:'Robert Baines', doctor:'Dr. Osei · Orthopaedics', status:'checkedin', statusLabel:'Stable',         color:'rgba(74,222,128,0.08)',  borderColor:'rgba(74,222,128,0.2)' },
+  { id:'r4', label:'ROOM 4', patient:'Yuki Matsuda',  doctor:'Dr. Chen · Post-Op',      status:'progress',  statusLabel:'In Consult',     color:'rgba(96,165,250,0.08)',  borderColor:'rgba(96,165,250,0.2)' },
+  { id:'ba', label:'BAY A',  patient:'Fatima Nour',   doctor:'Dr. Patel · Follow-Up',   status:'waiting',   statusLabel:'Waiting Rx',     color:'rgba(196,132,252,0.08)', borderColor:'rgba(196,132,252,0.2)' },
+  { id:'bb', label:'BAY B',  patient:'James Thornton',doctor:'Dr. Osei · Wellness',     status:'checkedin', statusLabel:'Checked In',     color:'rgba(251,191,36,0.08)',  borderColor:'rgba(251,191,36,0.2)' },
   { id:'r5', label:'ROOM 5 — Available', available:true, color:'', borderColor:'' },
   { id:'bc', label:'BAY C — Available',  available:true, color:'', borderColor:'' },
 ];
@@ -522,8 +491,8 @@ const PAGE_LABELS: Record<TabId, [string, string]> = {
   vitals:    ['Vitals Monitor',    'Record & review patient observations'],
   careplans: ['Care Plans',        'Active plans — Ward B'],
   handover:  ['Shift Handover',    'Incoming notes & outgoing log'],
-  tasks:     ['My Tasks',         'Morning shift task list'],
-  ward:      ['Ward Overview',    'Ward B — bed status & staff'],
+  tasks:     ['My Tasks',          'Morning shift task list'],
+  ward:      ['Ward Overview',     'Ward B — bed status & staff'],
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -546,13 +515,12 @@ function SvgIcon({ path, size = 16, color = 'currentColor' }: { path: string; si
   );
 }
 
-// ─── Tab: Check-In ────────────────────────────────────────────────────────────
+// ─── Tab screens (inline for brevity) ────────────────────────────────────────
 
 const CheckInTab: React.FC = () => {
   const [search, setSearch] = useState('');
   return (
     <div className="nr-content">
-      {/* Stats */}
       <div className="nr-stats-row">
         {([['Waiting','7','#fbbf24','In queue now'],['Checked In','18','#4ade80','Today total'],
            ['Avg Wait','12','#f472b6','This morning'],['Appts Today','34','#60a5fa','Scheduled'],
@@ -564,15 +532,10 @@ const CheckInTab: React.FC = () => {
           </div>
         ))}
       </div>
-
       <div className="nr-two-col">
-        {/* Queue */}
         <div className="nr-panel">
           <div className="nr-panel-header">
-            <div>
-              <div className="nr-panel-title">Patient Queue</div>
-              <div className="nr-panel-sub">Live waiting list — updated in real time</div>
-            </div>
+            <div><div className="nr-panel-title">Patient Queue</div><div className="nr-panel-sub">Live waiting list</div></div>
             <button className="nr-btn nr-btn-ghost" style={{ padding:'6px 12px', fontSize:12 }}>Refresh</button>
           </div>
           <div className="nr-panel-body">
@@ -593,59 +556,28 @@ const CheckInTab: React.FC = () => {
             ))}
           </div>
         </div>
-
-        {/* Quick Check-In form */}
         <div className="nr-panel">
           <div className="nr-panel-header">
-            <div>
-              <div className="nr-panel-title">Quick Check-In</div>
-              <div className="nr-panel-sub">Walk-in or appointment arrival</div>
-            </div>
+            <div><div className="nr-panel-title">Quick Check-In</div><div className="nr-panel-sub">Walk-in or appointment arrival</div></div>
           </div>
           <div className="nr-panel-body">
             <div className="nr-form-field">
               <label className="nr-form-label">Patient Name or ID</label>
-              <input className="nr-form-input" type="text" placeholder="Search by name, DOB or patient ID…" value={search} onChange={e => setSearch(e.target.value)} />
+              <input className="nr-form-input" placeholder="Search by name, DOB or patient ID…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <div className="nr-form-row">
-              <div className="nr-form-field">
-                <label className="nr-form-label">Arrival Time</label>
-                <input className="nr-form-input" type="time" defaultValue="09:42" />
-              </div>
-              <div className="nr-form-field">
-                <label className="nr-form-label">Visit Type</label>
-                <select className="nr-form-select">
-                  <option>Scheduled Appt</option><option>Walk-In</option>
-                  <option>Emergency</option><option>Follow-Up</option>
-                </select>
-              </div>
+              <div className="nr-form-field"><label className="nr-form-label">Arrival Time</label><input className="nr-form-input" type="time" defaultValue="09:42" /></div>
+              <div className="nr-form-field"><label className="nr-form-label">Visit Type</label><select className="nr-form-select"><option>Scheduled Appt</option><option>Walk-In</option><option>Emergency</option><option>Follow-Up</option></select></div>
             </div>
             <div className="nr-form-field">
               <label className="nr-form-label">Assigned Doctor</label>
-              <select className="nr-form-select">
-                <option>Dr. Patel · Cardiology</option><option>Dr. Chen · General</option>
-                <option>Dr. Osei · Orthopaedics</option><option>Dr. Williams · Neurology</option>
-              </select>
+              <select className="nr-form-select"><option>Dr. Patel · Cardiology</option><option>Dr. Chen · General</option><option>Dr. Osei · Orthopaedics</option></select>
             </div>
             <div className="nr-form-row">
-              <div className="nr-form-field">
-                <label className="nr-form-label">Room / Bay</label>
-                <select className="nr-form-select">
-                  <option>— Assign —</option><option>Room 1</option><option>Room 2</option>
-                  <option>Room 3</option><option>Room 4</option><option>Bay A</option><option>Bay B</option>
-                </select>
-              </div>
-              <div className="nr-form-field">
-                <label className="nr-form-label">Priority</label>
-                <select className="nr-form-select">
-                  <option>Normal</option><option>Urgent</option><option>Emergency</option>
-                </select>
-              </div>
+              <div className="nr-form-field"><label className="nr-form-label">Room / Bay</label><select className="nr-form-select"><option>— Assign —</option><option>Room 1</option><option>Room 2</option><option>Room 3</option><option>Room 4</option><option>Bay A</option><option>Bay B</option></select></div>
+              <div className="nr-form-field"><label className="nr-form-label">Priority</label><select className="nr-form-select"><option>Normal</option><option>Urgent</option><option>Emergency</option></select></div>
             </div>
-            <div className="nr-form-field">
-              <label className="nr-form-label">Chief Complaint / Notes</label>
-              <textarea className="nr-form-textarea" rows={3} placeholder="Brief reason for visit…" />
-            </div>
+            <div className="nr-form-field"><label className="nr-form-label">Chief Complaint / Notes</label><textarea className="nr-form-textarea" rows={3} placeholder="Brief reason for visit…" /></div>
             <button className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center' }}>
               <SvgIcon path="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z" color="white" />
               Confirm Check-In
@@ -657,67 +589,71 @@ const CheckInTab: React.FC = () => {
   );
 };
 
-// ─── Tab: Appointments ────────────────────────────────────────────────────────
-
-const ScheduleTab: React.FC = () => (
-  <div className="nr-content">
-    <div className="nr-stats-row nr-stats-4col" style={{ gridTemplateColumns:'repeat(4,1fr)' }}>
-      {([['Total Today','34','#60a5fa','Scheduled'],['Confirmed','29','#4ade80','Responded'],
-         ['Unconfirmed','3','#fbbf24','Awaiting reply'],['Cancelled','2','#f87171','Today']] as [string,string,string,string][]).map(([l,v,c,s]) => (
-        <div key={l} className="nr-stat-card">
-          <div className="nr-stat-label">{l}</div>
-          <div className="nr-stat-value" style={{ color:c }}>{v}</div>
-          <div className="nr-stat-sub">{s}</div>
-        </div>
-      ))}
-    </div>
-    <div className="nr-two-col">
-      <div className="nr-panel">
-        <div className="nr-panel-header">
-          <div><div className="nr-panel-title">Today's Schedule</div><div className="nr-panel-sub">Morning shift · May 2, 2026</div></div>
-          <button className="nr-btn nr-btn-primary" style={{ padding:'6px 14px', fontSize:12 }}>+ Book Slot</button>
-        </div>
-        <div className="nr-panel-body">
-          {APPOINTMENTS.map(a => (
-            <div key={a.time + a.patient} className="nr-appt-row">
-              <div className="nr-appt-time">{a.time}</div>
-              <div className="nr-appt-dot" style={{ background: a.dotColor }} />
-              <div style={{ flex:1, minWidth:0 }}>
-                <div className="nr-appt-patient">{a.patient}</div>
-                <div className="nr-appt-detail">{a.detail}</div>
-              </div>
-              <Chip status={a.status} label={a.status === 'checkedin' ? 'Present' : a.status === 'upcoming' ? 'Upcoming' : undefined} />
+const ScheduleTab: React.FC = () => {
+  const [activeDay, setActiveDay] = useState(6);
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dates = [20,21,22,23,24,25,26];
+  const counts = [5,8,6,9,7,4,34];
+  return (
+    <div className="nr-content">
+      <div className="nr-stats-row" style={{ gridTemplateColumns:'repeat(4,1fr)' }}>
+        {([['Total Today','34','#60a5fa','Scheduled'],['Confirmed','29','#4ade80','Responded'],['Unconfirmed','3','#fbbf24','Awaiting reply'],['Cancelled','2','#f87171','Today']] as [string,string,string,string][]).map(([l,v,c,s]) => (
+          <div key={l} className="nr-stat-card">
+            <div className="nr-stat-label">{l}</div>
+            <div className="nr-stat-value" style={{ color:c }}>{v}</div>
+            <div className="nr-stat-sub">{s}</div>
+          </div>
+        ))}
+      </div>
+      <div className="nr-two-col">
+        <div className="nr-panel">
+          <div className="nr-panel-header">
+            <div><div className="nr-panel-title">Today's Schedule</div><div className="nr-panel-sub">Morning shift · May 2, 2026</div></div>
+            <button className="nr-btn nr-btn-primary" style={{ padding:'6px 14px', fontSize:12 }}>+ Book Slot</button>
+          </div>
+          <div className="nr-panel-body">
+            <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+              {days.map((d, i) => (
+                <div key={d} onClick={() => setActiveDay(i)} style={{ flex:1, textAlign:'center', padding:'8px 4px', borderRadius:10, background: activeDay===i ? 'rgba(236,72,153,0.2)' : 'rgba(255,255,255,0.04)', border: activeDay===i ? '1px solid rgba(236,72,153,0.4)' : '1px solid rgba(255,255,255,0.07)', cursor:'pointer' }}>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:2 }}>{d}</div>
+                  <div style={{ fontSize:13, fontWeight:700 }}>{dates[i]}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:3 }}>{counts[i]}</div>
+                </div>
+              ))}
             </div>
-          ))}
+            {APPOINTMENTS.map(a => (
+              <div key={a.time+a.patient} className="nr-appt-row">
+                <div className="nr-appt-time">{a.time}</div>
+                <div className="nr-appt-dot" style={{ background: a.dotColor }} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div className="nr-appt-patient">{a.patient}</div>
+                  <div className="nr-appt-detail">{a.detail}</div>
+                </div>
+                <Chip status={a.status} />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="nr-panel">
-        <div className="nr-panel-header">
-          <div><div className="nr-panel-title">Book Appointment</div><div className="nr-panel-sub">Schedule a new slot</div></div>
-        </div>
-        <div className="nr-panel-body">
-          <div className="nr-form-field"><label className="nr-form-label">Patient</label><input className="nr-form-input" type="text" placeholder="Search patient…" /></div>
-          <div className="nr-form-row">
-            <div className="nr-form-field"><label className="nr-form-label">Date</label><input className="nr-form-input" type="date" defaultValue="2026-05-02" /></div>
-            <div className="nr-form-field"><label className="nr-form-label">Time</label><input className="nr-form-input" type="time" defaultValue="10:00" /></div>
+        <div className="nr-panel">
+          <div className="nr-panel-header"><div><div className="nr-panel-title">Book Appointment</div></div></div>
+          <div className="nr-panel-body">
+            <div className="nr-form-field"><label className="nr-form-label">Patient</label><input className="nr-form-input" placeholder="Search patient…" /></div>
+            <div className="nr-form-row">
+              <div className="nr-form-field"><label className="nr-form-label">Date</label><input className="nr-form-input" type="date" defaultValue="2026-05-02" /></div>
+              <div className="nr-form-field"><label className="nr-form-label">Time</label><input className="nr-form-input" type="time" defaultValue="10:00" /></div>
+            </div>
+            <div className="nr-form-field"><label className="nr-form-label">Doctor</label><select className="nr-form-select"><option>Dr. Patel · Cardiology</option><option>Dr. Chen · General</option><option>Dr. Osei · Orthopaedics</option></select></div>
+            <div className="nr-form-row">
+              <div className="nr-form-field"><label className="nr-form-label">Duration</label><select className="nr-form-select"><option>15 min</option><option>20 min</option><option>30 min</option><option>45 min</option><option>60 min</option></select></div>
+              <div className="nr-form-field"><label className="nr-form-label">Type</label><select className="nr-form-select"><option>Consultation</option><option>Follow-Up</option><option>Procedure</option><option>Wellness</option></select></div>
+            </div>
+            <button className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center', marginTop:8 }}>Schedule Appointment</button>
           </div>
-          <div className="nr-form-field">
-            <label className="nr-form-label">Doctor</label>
-            <select className="nr-form-select"><option>Dr. Patel · Cardiology</option><option>Dr. Chen · General</option><option>Dr. Osei · Orthopaedics</option><option>Dr. Williams · Neurology</option></select>
-          </div>
-          <div className="nr-form-row">
-            <div className="nr-form-field"><label className="nr-form-label">Duration</label><select className="nr-form-select"><option>15 min</option><option>20 min</option><option>30 min</option><option>45 min</option><option>60 min</option></select></div>
-            <div className="nr-form-field"><label className="nr-form-label">Type</label><select className="nr-form-select"><option>Consultation</option><option>Follow-Up</option><option>Procedure</option><option>Wellness</option></select></div>
-          </div>
-          <div className="nr-form-field"><label className="nr-form-label">Notes</label><textarea className="nr-form-textarea" rows={3} placeholder="Additional notes…" /></div>
-          <button className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center' }}>Schedule Appointment</button>
         </div>
       </div>
     </div>
-  </div>
-);
-
-// ─── Tab: Vitals ──────────────────────────────────────────────────────────────
+  );
+};
 
 const VitalsTab: React.FC = () => {
   const [rrValues, setRrValues] = useState(VITALS_PATIENTS.map(p => p.rr));
@@ -729,33 +665,26 @@ const VitalsTab: React.FC = () => {
           <div key={p.name} className="nr-panel">
             <div className="nr-panel-header">
               <div><div className="nr-panel-title">{p.name}</div><div className="nr-panel-sub">{p.room} · {p.doctor} · Recorded {p.recorded}</div></div>
-              <Chip status={p.status} label={p.status === 'checkedin' ? 'Stable' : undefined} />
+              <Chip status={p.status} />
             </div>
             <div className="nr-panel-body">
               <div className="nr-vitals-grid">
-                {([['Blood Pressure', p.bp.val, '',    p.bp.trend,   p.bp.color],
-                   ['Heart Rate',     p.hr.val, 'bpm', p.hr.trend,   p.hr.color],
-                   ['SpO₂',          p.spo2.val,'%',  p.spo2.trend, p.spo2.color],
-                   ['Temperature',   p.temp.val,'°C',  p.temp.trend, p.temp.color]] as [string,string,string,string,string][]).map(([label,val,unit,trend,color]) => (
+                {([['Blood Pressure',p.bp.val,'',p.bp.trend,p.bp.color],['Heart Rate',p.hr.val,'bpm',p.hr.trend,p.hr.color],['SpO₂',p.spo2.val,'%',p.spo2.trend,p.spo2.color],['Temperature',p.temp.val,'°C',p.temp.trend,p.temp.color]] as [string,string,string,string,string][]).map(([label,val,unit,trend,color]) => (
                   <div key={label} className="nr-vital-box">
                     <div className="nr-vital-label">{label}</div>
-                    <div className="nr-vital-val" style={{ color }}>
-                      {val}<span className="nr-vital-unit">{unit}</span>
-                    </div>
+                    <div className="nr-vital-val" style={{ color }}>{val}<span className="nr-vital-unit">{unit}</span></div>
                     <div className="nr-vital-trend" style={{ color }}>{trend}</div>
                   </div>
                 ))}
               </div>
               <div style={{ marginTop:12 }}>
                 <div className="nr-form-field">
-                  <label className="nr-form-label">Respiratory Rate <span style={{ color:'rgba(255,255,255,0.3)' }}>(breaths/min)</span></label>
-                  <input className="nr-form-input" type="number" value={rrValues[idx]}
-                    onChange={e => setRrValues(v => v.map((x,i) => i===idx ? +e.target.value : x))} />
+                  <label className="nr-form-label">Respiratory Rate (breaths/min)</label>
+                  <input className="nr-form-input" type="number" value={rrValues[idx]} onChange={e => setRrValues(v => v.map((x,i) => i===idx ? +e.target.value : x))} />
                 </div>
                 <div className="nr-form-field">
-                  <label className="nr-form-label">Pain Score <span style={{ color:'rgba(255,255,255,0.3)' }}>(0-10)</span></label>
-                  <input className="nr-form-input" type="number" value={painValues[idx]} min={0} max={10}
-                    onChange={e => setPainValues(v => v.map((x,i) => i===idx ? +e.target.value : x))} />
+                  <label className="nr-form-label">Pain Score (0-10)</label>
+                  <input className="nr-form-input" type="number" value={painValues[idx]} min={0} max={10} onChange={e => setPainValues(v => v.map((x,i) => i===idx ? +e.target.value : x))} />
                 </div>
                 <button className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center', marginTop:4 }}>Save Vitals</button>
               </div>
@@ -767,20 +696,13 @@ const VitalsTab: React.FC = () => {
   );
 };
 
-// ─── Tab: Care Plans ──────────────────────────────────────────────────────────
-
-type CarePlanGoal = { text: string; done: boolean; priority: Priority };
-
-const PLAN_GOALS: CarePlanGoal[] = [
-  { text:'BP below 140/90 within 2 weeks',         done:true,  priority:'high' },
-  { text:'Daily BP monitoring logged',              done:true,  priority:'med'  },
-  { text:'Patient education — diet & sodium',      done:false, priority:'med'  },
-  { text:'Referral to cardiologist if no improvement', done:false, priority:'high' },
-];
-
 const CarePlansTab: React.FC = () => {
-  const [goals, setGoals] = useState<CarePlanGoal[]>(PLAN_GOALS);
-  const toggleGoal = (i: number) => setGoals(g => g.map((x, j) => j === i ? { ...x, done: !x.done } : x));
+  const [goals, setGoals] = useState([
+    { text:'BP below 140/90 within 2 weeks', done:true },
+    { text:'Daily BP monitoring logged', done:true },
+    { text:'Patient education — diet & sodium', done:false },
+    { text:'Referral to cardiologist if no improvement', done:false },
+  ]);
   return (
     <div className="nr-content">
       <div className="nr-two-col">
@@ -804,27 +726,16 @@ const CarePlansTab: React.FC = () => {
           </div>
         </div>
         <div className="nr-panel">
-          <div className="nr-panel-header">
-            <div><div className="nr-panel-title">Mohammed Khan — Care Plan</div><div className="nr-panel-sub">Hypertension Management</div></div>
-          </div>
+          <div className="nr-panel-header"><div><div className="nr-panel-title">Mohammed Khan — Care Plan</div><div className="nr-panel-sub">Hypertension Management</div></div></div>
           <div className="nr-panel-body">
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:10 }}>Goals</div>
             {goals.map((g, i) => (
-              <div key={i} className="nr-task-row">
-                <button className={`nr-task-check ${g.done ? 'done' : ''}`} onClick={() => toggleGoal(i)}>
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+                <button onClick={() => setGoals(gs => gs.map((x,j) => j===i?{...x,done:!x.done}:x))}
+                  style={{ width:18, height:18, borderRadius:5, flexShrink:0, border:`1.5px solid ${g.done?'#f472b6':'rgba(255,255,255,0.2)'}`, background:g.done?'#f472b6':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   {g.done && <SvgIcon path="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" size={10} color="white" />}
                 </button>
-                <div style={{ flex:1 }}>
-                  <div className={`nr-task-text ${g.done ? 'done' : ''}`}>{g.text}</div>
-                </div>
-                <span className={`nr-task-priority nr-prio-${g.priority}`}>{g.priority === 'high' ? 'High' : 'Med'}</span>
-              </div>
-            ))}
-            <div style={{ marginTop:16, fontSize:12, color:'rgba(255,255,255,0.4)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:10 }}>Medications</div>
-            {[['Amlodipine 5mg','Once daily · Morning · With food'],['Ramipril 2.5mg','Once daily · Evening · Monitor potassium']].map(([name, schedule]) => (
-              <div key={name} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:'12px 14px', marginBottom:8 }}>
-                <div style={{ fontSize:13, fontWeight:700 }}>{name}</div>
-                <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:2 }}>{schedule}</div>
+                <span style={{ fontSize:13, fontWeight:500, flex:1, textDecoration:g.done?'line-through':'none', color:g.done?'rgba(255,255,255,0.35)':'white' }}>{g.text}</span>
               </div>
             ))}
             <button className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center', marginTop:16 }}>Update Care Plan</button>
@@ -835,17 +746,13 @@ const CarePlansTab: React.FC = () => {
   );
 };
 
-// ─── Tab: Handover ────────────────────────────────────────────────────────────
-
 const HandoverTab: React.FC = () => {
-  const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
+  const [priority, setPriority] = useState<'normal'|'important'|'urgent'>('normal');
   return (
     <div className="nr-content">
       <div className="nr-two-col">
         <div className="nr-panel">
-          <div className="nr-panel-header">
-            <div><div className="nr-panel-title">Incoming Handover Notes</div><div className="nr-panel-sub">From Night Shift · Nurse T. James</div></div>
-          </div>
+          <div className="nr-panel-header"><div><div className="nr-panel-title">Incoming Handover Notes</div><div className="nr-panel-sub">From Night Shift · Nurse T. James</div></div></div>
           <div className="nr-panel-body">
             {HANDOVER_NOTES.map((n, i) => (
               <div key={i} className="nr-note-card">
@@ -860,40 +767,18 @@ const HandoverTab: React.FC = () => {
           </div>
         </div>
         <div className="nr-panel">
-          <div className="nr-panel-header">
-            <div><div className="nr-panel-title">Write Handover Note</div><div className="nr-panel-sub">For outgoing shift — Evening Team</div></div>
-          </div>
+          <div className="nr-panel-header"><div><div className="nr-panel-title">Write Handover Note</div></div></div>
           <div className="nr-panel-body">
-            <div className="nr-form-field">
-              <label className="nr-form-label">Patient (optional)</label>
-              <select className="nr-form-select">
-                <option value="">— Ward-wide note —</option>
-                <option>Mohammed Khan · Room 1</option><option>Yuki Matsuda · Room 4</option>
-                <option>Robert Baines · Room 3</option><option>Fatima Nour · Bay A</option>
-              </select>
-            </div>
+            <div className="nr-form-field"><label className="nr-form-label">Patient (optional)</label><select className="nr-form-select"><option value="">— Ward-wide note —</option><option>Mohammed Khan · Room 1</option><option>Yuki Matsuda · Room 4</option><option>Robert Baines · Room 3</option></select></div>
             <div className="nr-form-field">
               <label className="nr-form-label">Priority</label>
               <div className="nr-radio-row">
                 {(['normal','important','urgent'] as const).map(p => (
-                  <label key={p} className="nr-radio-label">
-                    <input type="radio" name="handover-prio" value={p} checked={priority===p} onChange={() => setPriority(p)} />
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </label>
+                  <label key={p} className="nr-radio-label"><input type="radio" name="handover-prio" value={p} checked={priority===p} onChange={() => setPriority(p)} />{p.charAt(0).toUpperCase()+p.slice(1)}</label>
                 ))}
               </div>
             </div>
-            <div className="nr-form-field">
-              <label className="nr-form-label">Note</label>
-              <textarea className="nr-form-textarea" rows={7} placeholder="Describe patient status, outstanding tasks, medication changes, concerns for next shift…" />
-            </div>
-            <div className="nr-form-field">
-              <label className="nr-form-label">Flag for Doctor</label>
-              <select className="nr-form-select">
-                <option value="">— None —</option>
-                <option>Dr. Patel</option><option>Dr. Chen</option><option>Dr. Osei</option><option>Dr. Williams</option>
-              </select>
-            </div>
+            <div className="nr-form-field"><label className="nr-form-label">Note</label><textarea className="nr-form-textarea" rows={7} placeholder="Describe patient status, outstanding tasks, medication changes…" /></div>
             <button className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center' }}>Submit Handover Note</button>
           </div>
         </div>
@@ -902,85 +787,46 @@ const HandoverTab: React.FC = () => {
   );
 };
 
-// ─── Tab: Tasks ───────────────────────────────────────────────────────────────
-
 const TasksTab: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [newTask, setNewTask] = useState('');
   const [newTime, setNewTime] = useState('');
   const [newPriority, setNewPriority] = useState<Priority>('high');
-
-  const toggleTask = (id: number) =>
-    setTasks(t => t.map(x => x.id === id ? { ...x, done: !x.done } : x));
-
+  const toggleTask = (id: number) => setTasks(t => t.map(x => x.id===id ? {...x, done:!x.done} : x));
   const addTask = () => {
     if (!newTask.trim()) return;
-    const next: Task = { id: Date.now(), text: newTask.trim(), dueTime: newTime ? `Due: ${newTime}` : 'Due: —', priority: newPriority, done: false };
-    setTasks(t => [next, ...t]);
+    setTasks(t => [{ id:Date.now(), text:newTask.trim(), dueTime:newTime?`Due: ${newTime}`:'Due: —', priority:newPriority, done:false }, ...t]);
     setNewTask(''); setNewTime('');
   };
-
-  const pendingCount = tasks.filter(t => !t.done).length;
   return (
     <div className="nr-content">
       <div className="nr-two-col">
         <div className="nr-panel">
-          <div className="nr-panel-header">
-            <div><div className="nr-panel-title">My Task List</div><div className="nr-panel-sub">Morning shift · {pendingCount} pending</div></div>
-            <button onClick={addTask} className="nr-btn nr-btn-primary" style={{ padding:'6px 14px', fontSize:12 }}>+ Add Task</button>
-          </div>
+          <div className="nr-panel-header"><div><div className="nr-panel-title">My Task List</div><div className="nr-panel-sub">{tasks.filter(t=>!t.done).length} pending</div></div><button onClick={addTask} className="nr-btn nr-btn-primary" style={{ padding:'6px 14px', fontSize:12 }}>+ Add Task</button></div>
           <div className="nr-panel-body">
             {tasks.map(task => (
               <div key={task.id} className="nr-task-row">
-                <button className={`nr-task-check ${task.done ? 'done' : ''}`} onClick={() => toggleTask(task.id)}>
+                <button className={`nr-task-check ${task.done?'done':''}`} onClick={() => toggleTask(task.id)}>
                   {task.done && <SvgIcon path="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" size={10} color="white" />}
                 </button>
                 <div style={{ flex:1 }}>
-                  <div className={`nr-task-text ${task.done ? 'done' : ''}`}>{task.text}</div>
+                  <div className={`nr-task-text ${task.done?'done':''}`}>{task.text}</div>
                   <div className="nr-task-time">{task.dueTime}</div>
                 </div>
-                <span className={`nr-task-priority nr-prio-${task.done ? 'done' : task.priority}`}>
-                  {task.done ? 'Done' : task.priority === 'high' ? 'High' : task.priority === 'med' ? 'Med' : 'Low'}
-                </span>
+                <span className={`nr-task-priority nr-prio-${task.done?'done':task.priority}`}>{task.done?'Done':task.priority==='high'?'High':task.priority==='med'?'Med':'Low'}</span>
               </div>
             ))}
           </div>
         </div>
         <div className="nr-panel">
-          <div className="nr-panel-header">
-            <div><div className="nr-panel-title">Add New Task</div><div className="nr-panel-sub">Assign to yourself or team</div></div>
-          </div>
+          <div className="nr-panel-header"><div><div className="nr-panel-title">Add New Task</div></div></div>
           <div className="nr-panel-body">
-            <div className="nr-form-field">
-              <label className="nr-form-label">Task Description</label>
-              <input className="nr-form-input" type="text" placeholder="What needs to be done?" value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} />
-            </div>
+            <div className="nr-form-field"><label className="nr-form-label">Task Description</label><input className="nr-form-input" placeholder="What needs to be done?" value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key==='Enter'&&addTask()} /></div>
             <div className="nr-form-row">
-              <div className="nr-form-field">
-                <label className="nr-form-label">Due Time</label>
-                <input className="nr-form-input" type="time" value={newTime} onChange={e => setNewTime(e.target.value)} />
-              </div>
-              <div className="nr-form-field">
-                <label className="nr-form-label">Priority</label>
-                <select className="nr-form-select" value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}>
-                  <option value="high">High</option><option value="med">Medium</option><option value="low">Low</option>
-                </select>
-              </div>
+              <div className="nr-form-field"><label className="nr-form-label">Due Time</label><input className="nr-form-input" type="time" value={newTime} onChange={e => setNewTime(e.target.value)} /></div>
+              <div className="nr-form-field"><label className="nr-form-label">Priority</label><select className="nr-form-select" value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select></div>
             </div>
-            <div className="nr-form-field">
-              <label className="nr-form-label">Linked Patient (optional)</label>
-              <select className="nr-form-select">
-                <option value="">— None —</option>
-                <option>Mohammed Khan</option><option>Yuki Matsuda</option>
-                <option>Robert Baines</option><option>Fatima Nour</option>
-              </select>
-            </div>
-            <div className="nr-form-field">
-              <label className="nr-form-label">Assign To</label>
-              <select className="nr-form-select"><option>Me (Sarah R.)</option><option>Nurse T. James</option><option>Nurse A. Bloom</option></select>
-            </div>
-            <div className="nr-form-field"><label className="nr-form-label">Notes</label><textarea className="nr-form-textarea" rows={3} placeholder="Additional details…" /></div>
-            <button onClick={addTask} className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center' }}>Add to Task List</button>
+            <button onClick={addTask} className="nr-btn nr-btn-primary" style={{ width:'100%', justifyContent:'center', marginTop:8 }}>Add to Task List</button>
           </div>
         </div>
       </div>
@@ -988,27 +834,22 @@ const TasksTab: React.FC = () => {
   );
 };
 
-// ─── Tab: Ward Overview ───────────────────────────────────────────────────────
-
 const WardTab: React.FC = () => (
   <div className="nr-content">
-    <div className="nr-stats-row nr-stats-4col" style={{ gridTemplateColumns:'repeat(5,1fr)' }}>
-      {([['Beds Occupied','8/12','#f472b6','Ward B'],['Available','4','#4ade80','Open beds'],
-         ['Discharges','2','#60a5fa','Today'],['Transfers','1','#c084fc','Incoming'],
-         ['Staff on Shift','5','#fbbf24','Ward B now']] as [string,string,string,string][]).map(([l,v,c,s]) => (
+    <div className="nr-stats-row" style={{ gridTemplateColumns:'repeat(5,1fr)' }}>
+      {([['Beds Occupied','8/12','#f472b6','Ward B'],['Available','4','#4ade80','Open beds'],['Discharges','2','#60a5fa','Today'],['Transfers','1','#c084fc','Incoming'],['Staff on Shift','5','#fbbf24','Ward B now']] as [string,string,string,string][]).map(([l,v,c,s]) => (
         <div key={l} className="nr-stat-card">
           <div className="nr-stat-label">{l}</div>
-          <div className="nr-stat-value" style={{ color:c }}>
-            {v.includes('/') ? <>{v.split('/')[0]}<span style={{ fontSize:16, color:'rgba(255,255,255,0.4)' }}>/{v.split('/')[1]}</span></> : v}
+          <div className="nr-stat-value" style={{ color:c }}>{v.includes('/')
+            ? <>{v.split('/')[0]}<span style={{ fontSize:16, color:'rgba(255,255,255,0.4)' }}>/{v.split('/')[1]}</span></>
+            : v}
           </div>
           <div className="nr-stat-sub">{s}</div>
         </div>
       ))}
     </div>
     <div className="nr-panel">
-      <div className="nr-panel-header">
-        <div><div className="nr-panel-title">Ward B — Bed Overview</div><div className="nr-panel-sub">Real-time status</div></div>
-      </div>
+      <div className="nr-panel-header"><div><div className="nr-panel-title">Ward B — Bed Overview</div><div className="nr-panel-sub">Real-time status</div></div></div>
       <div className="nr-panel-body">
         <div className="nr-bed-grid">
           {BEDS.map(bed => bed.available ? (
@@ -1017,7 +858,7 @@ const WardTab: React.FC = () => (
               <div className="nr-bed-empty-label">{bed.label}</div>
             </div>
           ) : (
-            <div key={bed.id} className="nr-bed-card" style={{ background: bed.color, border: `1px solid ${bed.borderColor}` }}>
+            <div key={bed.id} className="nr-bed-card" style={{ background:bed.color, border:`1px solid ${bed.borderColor}` }}>
               <div className="nr-bed-label">{bed.label}</div>
               <div className="nr-bed-patient">{bed.patient}</div>
               <div className="nr-bed-doctor">{bed.doctor}</div>
@@ -1071,10 +912,11 @@ const Sidebar: React.FC<{
         </React.Fragment>
       ))}
 
+      {/* Single logout button in sidebar footer */}
       <div className="nr-sidebar-footer">
         <button className="nr-logout-btn" onClick={onSignOut}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
           Logout
         </button>
@@ -1085,18 +927,13 @@ const Sidebar: React.FC<{
 
 // ─── Root component ───────────────────────────────────────────────────────────
 
-interface ReceptionScreenProps {
-  nurseName?: string;
-  onSignOut?: () => void;
-}
-
 export default function ReceptionScreen({ nurseName = 'Maria Lopez', onSignOut }: ReceptionScreenProps) {
   const [tab, setTab]           = useState<TabId>('checkin');
   const [mobileOpen, setMobile] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [time, setTime]         = useState('');
   const timerRef                = useRef<ReturnType<typeof setInterval>>();
 
-  // Live clock in topbar
   useEffect(() => {
     const tick = () => setTime(new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }));
     tick();
@@ -1104,7 +941,6 @@ export default function ReceptionScreen({ nurseName = 'Maria Lopez', onSignOut }
     return () => clearInterval(timerRef.current);
   }, []);
 
-  // Close mobile nav on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobile(false); };
     window.addEventListener('keydown', handler);
@@ -1112,8 +948,8 @@ export default function ReceptionScreen({ nurseName = 'Maria Lopez', onSignOut }
   }, []);
 
   const handleNav = useCallback((t: TabId) => { setTab(t); setMobile(false); }, []);
-
   const [title, subtitle] = PAGE_LABELS[tab];
+  const abb = initials(nurseName);
 
   const tabContent = (() => {
     switch (tab) {
@@ -1131,17 +967,16 @@ export default function ReceptionScreen({ nurseName = 'Maria Lopez', onSignOut }
     <div className="nr-root">
       <style>{CSS}</style>
 
-      {/* Mobile overlay */}
       {mobileOpen && <div className="nr-overlay open" onClick={() => setMobile(false)} />}
 
-      <Sidebar active={tab} onNav={handleNav} mobileOpen={mobileOpen} nurseName={nurseName} onSignOut={onSignOut} />
+      <Sidebar active={tab} onNav={handleNav} mobileOpen={mobileOpen}
+        nurseName={nurseName} onSignOut={onSignOut} />
 
       <main className="nr-main">
-        {/* Topbar */}
+        {/* Topbar — no logout here, only profile avatar */}
         <div className="nr-topbar">
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <button className="nr-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu"
-              style={{ display:'none' }}>
+            <button className="nr-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
               <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="white" />
             </button>
             <div>
@@ -1162,12 +997,88 @@ export default function ReceptionScreen({ nurseName = 'Maria Lopez', onSignOut }
               <SvgIcon path="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" size={14} color="white" />
               New Check-In
             </button>
+
+            {/* Profile avatar — hover to see details + sign out. NO separate logout button here. */}
+            <div className="nr-header-profile" onClick={() => setShowProfile(true)}>
+              <div className="nr-header-avatar">{abb}</div>
+              <div className="nr-profile-tooltip">
+                <div className="nr-profile-tooltip-name">{nurseName}</div>
+                <div className="nr-profile-tooltip-role">Head Nurse · Ward B</div>
+                <div className="nr-profile-tooltip-divider" />
+                <button
+                  className="nr-profile-tooltip-signout"
+                  onClick={e => { e.stopPropagation(); setShowProfile(true); }}
+                  style={{ color: 'rgba(250,250,250,0.9)', marginBottom: 4 }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  View / Edit Profile
+                </button>
+                <button className="nr-profile-tooltip-signout" onClick={e => { e.stopPropagation(); onSignOut?.(); }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Sign out
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Tab content */}
         {tabContent}
       </main>
+
+      {/* ── Profile Modal ── */}
+      {showProfile && (
+        <div onClick={() => setShowProfile(false)} style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.5)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:200, backdropFilter:'blur(3px)'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:'#1a2440', borderRadius:16, padding:28,
+            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.4)',
+            border:'1px solid rgba(255,255,255,0.1)'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
+              <div style={{ width:60, height:60, borderRadius:'50%',
+                background:'linear-gradient(135deg,rgba(236,72,153,0.4),rgba(236,72,153,0.15))',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'#f472b6', fontSize:22, fontWeight:700 }}>{abb}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:17, color:'white' }}>{nurseName}</div>
+                <div style={{ fontSize:13, color:'rgba(255,255,255,0.5)' }}>Head Nurse · Nurse/Receptionist Portal</div>
+              </div>
+            </div>
+            {[['Full Name', nurseName], ['Email', 'reception@vexoo.in'], ['Phone', '+91 98765 43210'], ['Role', 'Head Nurse'], ['Ward', 'Ward B']].map(([label, val]) => (
+              <div key={label} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.4)', marginBottom:5, textTransform:'uppercase', letterSpacing:'0.5px' }}>{label}</div>
+                <input defaultValue={val} style={{
+                  width:'100%', padding:'9px 12px', border:'1px solid rgba(255,255,255,0.1)',
+                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
+                  color:'white', background:'rgba(255,255,255,0.06)'
+                }} />
+              </div>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setShowProfile(false)} style={{
+                flex:1, padding:'10px', borderRadius:10,
+                background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)',
+                color:'rgba(255,255,255,0.7)', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
+              }}>Close</button>
+              <button style={{
+                flex:1, padding:'10px', borderRadius:10, border:'none',
+                background:'linear-gradient(135deg,#ec4899,#be185d)', color:'white', cursor:'pointer',
+                fontFamily:'inherit', fontSize:13.5, fontWeight:600
+              }}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

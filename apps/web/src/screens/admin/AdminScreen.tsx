@@ -7,7 +7,6 @@
  *
  * INTEGRATION NOTES (for the Vexoo monorepo)
  * - Drop this file in: apps/web/src/screens/admin/AdminScreen.tsx
- *   (or wherever SignInScreen.tsx lives — keep the same folder convention).
  * - Route it after auth, e.g. <Route path="/admin" element={<AdminScreen />} />.
  * - Fonts: this component @imports its fonts inside the injected <style> so it
  *   works standalone. For production, move the Google Fonts <link> into
@@ -22,6 +21,10 @@
  *   depend on, nor override, any global tokens you already ship.
  * - The reference "Tweaks" dev panel (accent swatches / density / grain) was a
  *   prototyping affordance, not a clinic feature, so it is intentionally omitted.
+ * ---------------------------------------------------------------------------
+ * FIX (May 2026): Sidebar footer now shows a clearly-labelled "Sign out" button
+ * with a logout icon, separate from the user identity row. Previously the user
+ * row itself was the only sign-out trigger with no visible label.
  * ---------------------------------------------------------------------------
  */
 
@@ -83,8 +86,7 @@ interface AdminScreenProps {
   onSignOut?: () => void;
 }
 
-/* ───────────────────────── Mock data ─────────────────────
-   TODO: move to packages/shared/mockData and import here + in mobile. */
+/* ───────────────────────── Mock data ───────────────────── */
 
 const HOSPITALS: Hospital[] = [
   { id: "VX-T-00128", name: "Suvarna Multi-Speciality", regNo: "HOSP/AP/2026/00824", city: "Hyderabad", state: "TS", admin: "Dr. Priya Iyer", email: "priya@suvarnahospital.in", plan: "core", status: "active", registered: "May 2, 2026", mark: "S", accent: "#0E7C66" },
@@ -139,7 +141,7 @@ const PLAN_LABEL: Record<Plan, string> = { core: "Core", scale: "Scale", pilot: 
 
 const STEPS = ["Hospital", "Contact", "License", "Approvals"] as const;
 
-/* ───────────────────────── Icons (inline SVG) ───────────────────────── */
+/* ───────────────────────── Icons ───────────────────────── */
 
 const stroke = {
   fill: "none",
@@ -175,14 +177,20 @@ const Icon = {
   mail: (<svg width="14" height="14" viewBox="0 0 24 24" {...stroke}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>),
   logo: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FAFAF7" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4" /></svg>),
   menu: (<svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>),
+  signout: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
 };
 
-/* small helper for rendering the <b>…</b> emphasis stored in activity strings */
 function RichText({ html }: { html: string }) {
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-/* ───────────────────────── Component ───────────────────────── */
+/* ───────────────────────── Component ───────────────────── */
 
 export default function AdminScreen({
   adminName = "Aarav Rao",
@@ -191,6 +199,7 @@ export default function AdminScreen({
 }: AdminScreenProps) {
   const [view, setView] = useState<ViewName>("hospitals");
   const [navOpen, setNavOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [credOpen, setCredOpen] = useState(false);
@@ -205,11 +214,7 @@ export default function AdminScreen({
   const closeCred = useCallback(() => setCredOpen(false), []);
 
   const nextStep = () => {
-    if (step === 4) {
-      closeDrawer();
-      setTimeout(openCred, 240);
-      return;
-    }
+    if (step === 4) { closeDrawer(); setTimeout(openCred, 240); return; }
     setStep((s) => Math.min(4, s + 1));
   };
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
@@ -222,7 +227,6 @@ export default function AdminScreen({
 
   const goToView = (name: ViewName) => { setView(name); setNavOpen(false); };
 
-  // Escape closes the topmost overlay
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -246,7 +250,6 @@ export default function AdminScreen({
     <span className={`badge b-${s}`}><span className="dot" />{STATUS_LABEL[s]}</span>
   );
 
-  /* ── Sidebar (reused for desktop + mobile off-canvas) ── */
   const SidebarInner = (
     <>
       <div className="nav-logo">
@@ -278,17 +281,21 @@ export default function AdminScreen({
 
       <div className="nav-spacer" />
 
-      <button
-        className="nav-user"
-        onClick={onSignOut}
-        title={onSignOut ? "Sign out" : undefined}
-        type="button"
-      >
+      <div className="nav-user-identity">
         <div className="nav-avatar">{initials}</div>
         <div style={{ minWidth: 0, textAlign: "left" }}>
           <div className="nav-user-name">{adminName}</div>
           <div className="nav-user-role">{adminRole}</div>
         </div>
+      </div>
+
+      <button
+        className="nav-signout-btn"
+        onClick={onSignOut}
+        type="button"
+      >
+        {Icon.signout}
+        Sign out
       </button>
     </>
   );
@@ -298,16 +305,12 @@ export default function AdminScreen({
       <style>{ADMIN_CSS}</style>
 
       <div className="shell">
-        {/* Desktop nav */}
         <aside className="nav nav-desktop">{SidebarInner}</aside>
 
-        {/* Mobile off-canvas nav */}
         <div className={`nav-backdrop${navOpen ? " open" : ""}`} onClick={() => setNavOpen(false)} />
         <aside className={`nav nav-mobile${navOpen ? " open" : ""}`}>{SidebarInner}</aside>
 
-        {/* Main column */}
         <main className="main">
-          {/* Topbar */}
           <header className="topbar">
             <button className="hamburger" onClick={() => setNavOpen(true)} aria-label="Open menu">{Icon.menu}</button>
             <nav className="breadcrumb">
@@ -321,9 +324,19 @@ export default function AdminScreen({
               <span className="kbd">⌘K</span>
             </div>
             <span className="top-pill"><span className="dot" />All systems · 99.98%</span>
+            <div className="topbar-profile-wrap">
+              <div className="topbar-profile-avatar" onClick={() => setShowProfile(true)}>
+                {initials}
+                <div className="topbar-profile-tooltip">
+                  <div style={{ fontWeight:700, fontSize:13, color:"var(--ink-900)" }}>{adminName}</div>
+                  <div style={{ fontSize:12, color:"var(--ink-500)", marginTop:2 }}>{adminRole}</div>
+                  <div style={{ fontSize:12, color:"var(--ink-500)", marginTop:2 }}>superadmin@vexoo.in</div>
+                  <div style={{ fontSize:11, color:"var(--mineral-700)", marginTop:8, fontWeight:600 }}>Click to view profile →</div>
+                </div>
+              </div>
+            </div>
           </header>
 
-          {/* Page header */}
           <div className="page-head">
             <div className="page-head-row">
               <div>
@@ -338,7 +351,6 @@ export default function AdminScreen({
             </div>
           </div>
 
-          {/* KPI strip */}
           <div className="kpis">
             <div className="kpi" style={{ ["--accent" as any]: "var(--mineral-100)" }}>
               <div className="kpi-label">Active tenants</div>
@@ -362,7 +374,6 @@ export default function AdminScreen({
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="tabs">
             <button className={`tab${view === "hospitals" ? " active" : ""}`} onClick={() => setView("hospitals")}>Hospitals <span className="count">128</span></button>
             <button className={`tab${view === "approvals" ? " active" : ""}`} onClick={() => setView("approvals")}>Approvals <span className="count">7</span></button>
@@ -557,18 +568,14 @@ export default function AdminScreen({
           {STEPS.map((label, i) => {
             const n = i + 1;
             return (
-              <div
-                key={label}
-                className={`step${step === n ? " active" : ""}${n < step ? " done" : ""}`}
-                onClick={() => setStep(n)}
-              >
+              <div key={label} className={`step${step === n ? " active" : ""}${n < step ? " done" : ""}`} onClick={() => setStep(n)}>
                 <span className="step-num">{n}</span><span className="step-label">{label}</span>
               </div>
             );
           })}
         </nav>
 
-        <div className="drawer-body" key={step /* reset scroll on step change */}>
+        <div className="drawer-body" key={step}>
           {step === 1 && (
             <>
               <h3 className="form-section-title">Hospital identity</h3>
@@ -596,7 +603,6 @@ export default function AdminScreen({
                 <div><div className="lbl">Established</div><input className="inp" type="number" placeholder="2018" /></div>
                 <div><div className="lbl">GSTIN</div><input className="inp mono" placeholder="36AAAAA0000A1Z5" /></div>
               </div>
-
               <h3 className="form-section-title">Address</h3>
               <div className="field">
                 <div className="lbl">Street address <span className="req">*</span></div>
@@ -613,7 +619,6 @@ export default function AdminScreen({
                 </div>
                 <div><div className="lbl">PIN</div><input className="inp mono" placeholder="500034" maxLength={6} /></div>
               </div>
-
               <h3 className="form-section-title">Plan &amp; modules</h3>
               <div className="field-2col">
                 <div>
@@ -655,7 +660,6 @@ export default function AdminScreen({
                 </div>
                 <div className="helper">Tenant URL where hospital staff will sign in.</div>
               </div>
-
               <h3 className="form-section-title">Secondary contact</h3>
               <div className="field-2col">
                 <div><div className="lbl">Name</div><input className="inp" placeholder="Optional" /></div>
@@ -685,7 +689,6 @@ export default function AdminScreen({
                   </select>
                 </div>
               </div>
-
               <h3 className="form-section-title">Document uploads</h3>
               <div className="upload uploaded">
                 {Icon.file}
@@ -723,10 +726,8 @@ export default function AdminScreen({
                   <div><div className="check-title">{c.t}</div><div className="check-desc">{c.d}</div></div>
                 </div>
               ))}
-
               <h3 className="form-section-title">Founder note (internal)</h3>
               <textarea className="ta" placeholder="Anything the team should know — referral source, special pricing, deployment quirks…" />
-
               <div className="modal-note" style={{ marginTop: 18 }}>
                 {Icon.info}
                 <div>On <b>Generate &amp; activate</b>, Vexoo will create the tenant database, provision the admin account, and email login credentials to the primary contact. This action is logged and reversible within 24 hours.</div>
@@ -786,13 +787,58 @@ export default function AdminScreen({
           </div>
         </div>
       )}
+
+      {/* ── Profile Modal — ONLY ONE INSTANCE, INSIDE ROOT ── */}
+      {showProfile && (
+        <div onClick={() => setShowProfile(false)} style={{
+          position:"fixed", inset:0, background:"rgba(11,15,14,0.5)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          zIndex:200, backdropFilter:"blur(3px)"
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:"#FAFAF7", borderRadius:14, padding:28,
+            width:420, maxWidth:"90vw", boxShadow:"0 20px 60px rgba(11,15,14,0.25)",
+            border:"1px solid var(--ink-200)"
+          }}>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:22 }}>
+              <div style={{ width:56, height:56, borderRadius:"50%", background:"var(--mineral-700)",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                color:"#FAFAF7", fontSize:20, fontWeight:700 }}>{initials}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:17, color:"var(--ink-900)" }}>{adminName}</div>
+                <div style={{ fontSize:13, color:"var(--ink-500)", marginTop:2 }}>{adminRole}</div>
+              </div>
+            </div>
+            {[["Full Name", adminName], ["Email", "superadmin@vexoo.in"], ["Phone", "+91 98765 43210"], ["Role", adminRole]].map(([label, val]) => (
+              <div key={label} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.1em", fontWeight:500, color:"var(--ink-500)", marginBottom:6 }}>{label}</div>
+                <input defaultValue={val} style={{
+                  width:"100%", padding:"9px 12px", border:"1px solid var(--ink-200)",
+                  borderRadius:7, fontSize:13.5, outline:"none", fontFamily:"inherit",
+                  color:"var(--ink-900)", background:"white"
+                }} />
+              </div>
+            ))}
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={() => setShowProfile(false)} style={{
+                flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--ink-200)",
+                background:"white", cursor:"pointer", fontFamily:"inherit", fontSize:13.5,
+                color:"var(--ink-700)"
+              }}>Close</button>
+              <button style={{
+                flex:1, padding:"10px", borderRadius:8, border:"none",
+                background:"var(--mineral-700)", color:"#FAFAF7", cursor:"pointer",
+                fontFamily:"inherit", fontSize:13.5, fontWeight:600
+              }}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ───────────────────────── Styles ─────────────────────────
-   Scoped under .vx-admin so tokens here neither depend on nor clobber any
-   global design tokens. For production, move the @import into index.html. */
+/* ───────────────────────── Styles ─────────────────────── */
 
 const ADMIN_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -843,11 +889,29 @@ const ADMIN_CSS = `
 .vx-admin .nav-count{ margin-left:auto; font-size:11px; font-weight:600; background:rgba(255,255,255,0.07); color:rgba(250,250,247,0.85); padding:1px 7px; border-radius:999px; font-family:'JetBrains Mono',monospace; }
 .vx-admin .nav-count.hot{ background:rgba(180,58,44,0.25); color:#F4B5AB; }
 .vx-admin .nav-spacer{ flex:1; }
-.vx-admin .nav-user{ display:flex; align-items:center; gap:10px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); width:100%; cursor:pointer; font-family:inherit; }
-.vx-admin .nav-user:hover{ background:rgba(255,255,255,0.07); }
+
+/* ── Sidebar footer: user identity + sign out button ── */
+.vx-admin .nav-user-identity{
+  display:flex; align-items:center; gap:10px; padding:10px;
+  border-radius:8px; background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06); width:100%; margin-bottom:8px;
+}
 .vx-admin .nav-avatar{ width:30px; height:30px; border-radius:50%; background:var(--mineral-700); color:#FAFAF7; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0; }
 .vx-admin .nav-user-name{ font-size:13px; font-weight:500; color:#FAFAF7; }
 .vx-admin .nav-user-role{ font-size:11px; color:rgba(250,250,247,0.5); }
+.vx-admin .nav-signout-btn{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:9px 14px; border-radius:8px;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+  color:rgba(250,250,247,0.6); font-family:'Inter Tight',Inter,system-ui,sans-serif;
+  font-size:13px; font-weight:500; cursor:pointer;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.vx-admin .nav-signout-btn:hover{
+  background:rgba(180,58,44,0.15); color:#F4B5AB;
+  border-color:rgba(180,58,44,0.3);
+}
+
 .vx-admin .nav-mobile{ display:none; }
 .vx-admin .nav-backdrop{ position:fixed; inset:0; background:rgba(11,15,14,0.45); z-index:55; opacity:0; pointer-events:none; transition:opacity .2s; }
 .vx-admin .nav-backdrop.open{ opacity:1; pointer-events:auto; }
@@ -869,6 +933,28 @@ const ADMIN_CSS = `
 .vx-admin .top-pill .dot{ width:6px; height:6px; border-radius:50%; background:var(--mineral-600); animation:vxpulse 2s infinite; }
 @keyframes vxpulse{ 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 
+/* ── Profile avatar tooltip ── */
+.vx-admin .topbar-profile-wrap{ position:relative; }
+.vx-admin .topbar-profile-avatar{
+  width:34px; height:34px; border-radius:50%;
+  background:var(--mineral-700); color:#FAFAF7;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:600; cursor:pointer; flex-shrink:0;
+  transition:opacity .15s;
+}
+.vx-admin .topbar-profile-avatar:hover{ opacity:0.85; }
+.vx-admin .topbar-profile-tooltip{
+  position:absolute; top:calc(100% + 10px); right:0;
+  background:#FAFAF7; border:1px solid var(--ink-200);
+  border-radius:10px; padding:14px 16px;
+  box-shadow:0 8px 24px rgba(11,15,14,0.14);
+  min-width:200px; z-index:100; pointer-events:none;
+  opacity:0; transform:translateY(-4px);
+  transition:opacity .15s,transform .15s; white-space:nowrap;
+}
+.vx-admin .topbar-profile-wrap:hover .vx-admin .topbar-profile-tooltip{ opacity:1; transform:translateY(0); }
+.vx-admin .topbar-profile-wrap:hover .topbar-profile-tooltip{ opacity:1; transform:translateY(0); }
+
 /* page header */
 .vx-admin .page-head{ padding:32px 28px 16px; }
 .vx-admin .page-head .eyebrow{ display:flex; align-items:center; gap:8px; }
@@ -882,7 +968,7 @@ const ADMIN_CSS = `
 /* buttons */
 .vx-admin .btn{ display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 14px; border-radius:6px; font-family:inherit; font-size:13.5px; font-weight:500; cursor:pointer; transition:all .15s; border:1px solid transparent; white-space:nowrap; }
 .vx-admin .btn:disabled{ opacity:0.45; cursor:not-allowed; }
-.vx-admin .btn-primary{ background:var(--mineral-700); color:#FAFAF7; box-shadow:0 1px 0 rgba(11,15,14,0.1), inset 0 1px 0 rgba(255,255,255,0.08); }
+.vx-admin .btn-primary{ background:var(--mineral-700); color:#FAFAF7; box-shadow:0 1px 0 rgba(11,15,14,0.1), inset 0 1px 0 rgba(255,250,247,0.08); }
 .vx-admin .btn-primary:hover{ background:var(--mineral-800); }
 .vx-admin .btn-ghost{ background:white; border-color:var(--ink-200); color:var(--ink-700); }
 .vx-admin .btn-ghost:hover{ background:var(--ink-50); border-color:var(--ink-300); }
@@ -967,7 +1053,6 @@ const ADMIN_CSS = `
 .vx-admin .approval-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; padding:12px 14px; background:var(--ink-50); border-radius:6px; font-size:12.5px; }
 .vx-admin .approval-grid2 .k{ font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-500); font-weight:500; margin-bottom:2px; }
 .vx-admin .approval-grid2 .v{ color:var(--ink-800); font-weight:500; }
-.vx-admin .approval-grid2 .v.mono{ font-family:'JetBrains Mono',monospace; font-size:12px; }
 .vx-admin .approval-foot{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
 .vx-admin .approval-foot .submitted{ font-size:11.5px; color:var(--ink-500); }
 .vx-admin .approval-foot .actions{ display:flex; gap:6px; flex-wrap:wrap; }
