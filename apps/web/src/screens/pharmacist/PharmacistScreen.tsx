@@ -16,8 +16,10 @@
  *    pharmacistName?  — from AuthContext (e.g. "Mei Perez")
  *    onSignOut?       — called when Logout is clicked
  *
- *  Aesthetic: dark forest-green sidebar (#1b2e2c), light body (#f5f7fa),
- *             teal primary (#0d9488), Plus Jakarta Sans.
+ *  FIX (Jun 2026):
+ *  - Header now shows clickable profile avatar (top-right) with hover tooltip
+ *    displaying user details. Click opens an editable profile modal.
+ *  - Single Sign out button only in sidebar. No duplicate logout in header.
  * ============================================================================
  */
 
@@ -132,20 +134,29 @@ const CSS = `
 .ph-sidebar-footer {
   border-top: 1px solid rgba(255,255,255,0.07); padding: 12px;
 }
-.ph-logout-btn {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 13px; border-radius: 10px;
-  background: rgba(255,255,255,0.07); border: none;
-  color: rgba(255,255,255,0.55); font-size: 13px;
-  font-family: inherit; cursor: pointer; width: 100%; transition: background 0.13s;
+.ph-user-identity {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-radius: 10px; margin-bottom: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
 }
-.ph-logout-btn:hover { background: rgba(255,255,255,0.12); color: white; }
-.ph-user-row { display: flex; align-items: center; gap: 10px; padding: 10px 13px; margin-top: 4px; }
 .ph-user-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), #0891b2);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; color: white; font-size: 12px; flex-shrink: 0;
+}
+.ph-user-name { color: white; font-size: 12.5px; font-weight: 600; }
+.ph-user-role { color: rgba(255,255,255,0.4); font-size: 11px; }
+.ph-logout-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 13px; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.55); font-size: 13px; font-weight: 500;
+  font-family: inherit; cursor: pointer; width: 100%; transition: background 0.13s, color 0.13s, border-color 0.13s;
+}
+.ph-logout-btn:hover {
+  background: rgba(225,29,72,0.12); color: #f87171;
+  border-color: rgba(225,29,72,0.25);
 }
 
 /* mobile overlay */
@@ -175,6 +186,28 @@ const CSS = `
   font-size: 13px; width: 100%; font-family: inherit; color: var(--text);
 }
 .ph-header-date { font-size: 12px; color: var(--muted); }
+
+/* ── Profile avatar + tooltip ── */
+.ph-profile-wrap { position: relative; }
+.ph-profile-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #0891b2);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px;
+  cursor: pointer; flex-shrink: 0; transition: opacity 0.15s;
+}
+.ph-profile-avatar:hover { opacity: 0.85; }
+.ph-profile-tooltip {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  background: white; border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 200px; z-index: 100; pointer-events: none;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
+}
+.ph-profile-wrap:hover .ph-profile-tooltip { opacity: 1; transform: translateY(0); }
+
 .ph-scroll { flex: 1; overflow-y: auto; }
 
 /* ── Card ── */
@@ -259,7 +292,7 @@ const CSS = `
 /* ── Stock ── */
 .ph-stock-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
 .ph-stock-stat  { text-align: center; padding: 16px; }
-.ph-stock-bar-wrap { background: #f1f5f9; border-radius: 4px; height: 7px; overflow: hidden; min-width: 80px; }
+.ph-stock-bar-wrap { background: #f1f5f9; border-radius: 4px; height: 7px; overflow: hidden; min-width: 60px; }
 .ph-stock-bar { height: 100%; border-radius: 4px; transition: width 0.4s; }
 .ph-stock-action-btn {
   border-radius: 8px; padding: 5px 12px; font-size: 12px;
@@ -325,7 +358,7 @@ const PRESCRIPTIONS: Prescription[] = [
   { id:'RX-4822', patient:'Marcus Williams', pid:'P-002', drug:'Metformin 500mg',    qty:60, doctor:'Dr. Patel', time:'09:30 AM', status:'Verifying',  refills:3, dob:'Jun 8, 1974',  allergies:'None known',      instructions:'Take twice daily with meals' },
   { id:'RX-4823', patient:"James O'Brien",   pid:'P-004', drug:'Amiodarone 200mg',   qty:30, doctor:'Dr. Chen',  time:'10:15 AM', status:'Ready',      refills:0, dob:'Nov 3, 1959',  allergies:'Sulfonamides',    instructions:'Take with food. Regular ECG monitoring required' },
   { id:'RX-4824', patient:'Elena Rodriguez', pid:'P-003', drug:'Salbutamol Inhaler', qty:1,  doctor:'Dr. Kim',   time:'11:00 AM', status:'Pending',    refills:1, dob:'Feb 22, 1998', allergies:'None known',      instructions:'2 puffs as needed for shortness of breath' },
-  { id:'RX-4825', patient:'Priya Sharma',    pid:'P-005', drug:'Sumatriptan 50mg',   qty:9,  doctor:'Dr. Patel', time:'01:30 PM', status:'Dispensed',  refills:2, dob:'Jul 19, 1985', allergies:'Aspirin (mild)',   instructions:'Take at onset of migraine. Max 2 per day' },
+  { id:'RX-4825', patient:'Priya Sharma',    pid:'P-005', drug:'Sumatriptan 50mg',   qty:9,  doctor:'Dr. Patel', time:'01:30 PM', status:'Dispensed',  refills:2, dob:'Jul 19, 1985', allergies:'Aspirin (mild)',  instructions:'Take at onset of migraine. Max 2 per day' },
   { id:'RX-4826', patient:'Thomas Klein',    pid:'P-006', drug:'Tiotropium 18mcg',   qty:30, doctor:'Dr. Kim',   time:'02:00 PM', status:'Dispensed',  refills:1, dob:'Sep 4, 1967',  allergies:'None known',      instructions:'1 capsule inhaled daily via HandiHaler device' },
 ];
 
@@ -425,11 +458,10 @@ const QueueScreen: React.FC = () => {
 
   return (
     <div className="ph-queue-layout ph-fade">
-      {/* List */}
       <div className="ph-queue-list">
         <div className="ph-queue-stats">
           {([['Pending','var(--amber)','var(--al)'],['Verifying','var(--blue)','var(--bl)'],['Ready','var(--primary)','var(--pl)'],['Dispensed','var(--green)','var(--gl)']] as [string,string,string][]).map(([l,c,bg]) => (
-            <div key={l} className="ph-queue-stat" style={{ background:bg, borderColor:`${c.replace('var(--','#').replace(')','').length}25` || '#e4e8f0' }}>
+            <div key={l} className="ph-queue-stat" style={{ background:bg, borderColor:'var(--border)' }}>
               <div style={{ fontSize:24, fontWeight:800, color:c }}>{counts[l] || 0}</div>
               <div style={{ fontSize:12, color:c, marginTop:2, fontWeight:500 }}>{l}</div>
             </div>
@@ -460,7 +492,6 @@ const QueueScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Detail panel */}
       <div className="ph-queue-detail">
         <div className="ph-detail-header">
           <div style={{ fontSize:12, opacity:0.6, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.8px' }}>Prescription Detail</div>
@@ -469,7 +500,6 @@ const QueueScreen: React.FC = () => {
         </div>
 
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
-          {/* Patient */}
           <div className="ph-detail-section">
             <div className="ph-section-label">Patient</div>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
@@ -484,7 +514,6 @@ const QueueScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Drug details */}
           <div className="ph-detail-section">
             <div className="ph-section-label">Drug Details</div>
             {([['Medication', sel.drug], ['Quantity', `${sel.qty} units`], ['Refills Remaining', `${sel.refills} refills`], ['Instructions', sel.instructions]] as [string,string][]).map(([k, v]) => (
@@ -495,7 +524,6 @@ const QueueScreen: React.FC = () => {
             ))}
           </div>
 
-          {/* Interaction check */}
           <div className="ph-interaction-box">
             <div style={{ fontWeight:700, fontSize:13, color:'#92400e', marginBottom:6 }}>Interaction Check</div>
             <div style={{ fontSize:12.5, color:'#78350f', lineHeight:1.6 }}>
@@ -505,11 +533,8 @@ const QueueScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Action */}
           {curStatus !== 'Dispensed' ? (
-            <button className="ph-dispense-btn" onClick={advance}>
-              {ACTION_LABEL[curStatus]}
-            </button>
+            <button className="ph-dispense-btn" onClick={advance}>{ACTION_LABEL[curStatus]}</button>
           ) : (
             <div className="ph-dispensed-banner">✓ Dispensed Successfully</div>
           )}
@@ -643,7 +668,7 @@ const StockScreen: React.FC = () => (
   </div>
 );
 
-// ─── Screen: Dispensing Log ───────────────────────────────────────────────────
+// ─── Screen: History ──────────────────────────────────────────────────────────
 
 const HistoryScreen: React.FC = () => (
   <div className="ph-scroll ph-fade" style={{ padding:20 }}>
@@ -690,7 +715,7 @@ const HistoryScreen: React.FC = () => (
   </div>
 );
 
-// ─── Screen: Drug Interactions ────────────────────────────────────────────────
+// ─── Screen: Interactions ─────────────────────────────────────────────────────
 
 const InteractScreen: React.FC = () => {
   const [drugs, setDrugs] = useState(['', '']);
@@ -739,13 +764,13 @@ const InteractScreen: React.FC = () => {
 const MONTHS     = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
 const DISPENSED  = [420, 480, 510, 380, 540, 590, 538];
 const MAX_DISP   = Math.max(...DISPENSED);
-const TOP_DRUGS  = [
+const TOP_DRUGS: [string, number, string][] = [
   ['Paracetamol 500mg',142,'var(--primary)'],
   ['Metformin 500mg',  98, 'var(--blue)'],
   ['Lisinopril 10mg',  87, 'var(--purple)'],
   ['Atorvastatin 40mg',72, 'var(--amber)'],
   ['Omeprazole 20mg',  65, 'var(--rose)'],
-] as [string, number, string][];
+];
 
 const ReportsScreen: React.FC = () => (
   <div className="ph-scroll ph-fade" style={{ padding:20 }}>
@@ -801,9 +826,8 @@ const Sidebar: React.FC<{
         </div>
       </div>
 
-      {/* Quick stats strip */}
       <div className="ph-sidebar-stats">
-        {([['Pending','3','var(--al)','var(--amber)'],['Ready','1','var(--pl)','var(--primary)']] as [string,string,string,string][]).map(([l, v, , c]) => (
+        {([['Pending','3','var(--amber)'],['Ready','1','var(--primary)']] as [string,string,string][]).map(([l, v, c]) => (
           <div key={l} className="ph-stat-pill">
             <div style={{ fontSize:20, fontWeight:800, color:c }}>{v}</div>
             <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.45)', marginTop:1 }}>{l}</div>
@@ -824,22 +848,23 @@ const Sidebar: React.FC<{
         })}
       </nav>
 
+      {/* Sidebar footer: user identity (read-only) + sign out button */}
       <div className="ph-sidebar-footer">
+        <div className="ph-user-identity">
+          <div className="ph-user-avatar">{abb}</div>
+          <div>
+            <div className="ph-user-name">{pharmacistName}</div>
+            <div className="ph-user-role">Lead Pharmacist</div>
+          </div>
+        </div>
         <button className="ph-logout-btn" onClick={onSignOut}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
-          Logout
+          Sign out
         </button>
-        <div className="ph-user-row">
-          <div className="ph-user-avatar">{abb}</div>
-          <div>
-            <div style={{ color:'white', fontSize:12.5, fontWeight:600 }}>{pharmacistName}</div>
-            <div style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Lead Pharmacist</div>
-          </div>
-        </div>
       </div>
     </aside>
   );
@@ -850,9 +875,12 @@ const Sidebar: React.FC<{
 export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignOut }: PharmacistScreenProps) {
   const [screen, setScreen]     = useState<ScreenId>('queue');
   const [mobileOpen, setMobile] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const abb = initials(pharmacistName);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobile(false); };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMobile(false); setShowProfile(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
@@ -882,6 +910,7 @@ export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignO
         pharmacistName={pharmacistName} onSignOut={onSignOut} />
 
       <div className="ph-main">
+        {/* Header — NO logout button here. Single sign-out is in sidebar only. */}
         <div className="ph-header">
           <button className="ph-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
             <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
@@ -893,10 +922,70 @@ export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignO
             <input placeholder="Search prescriptions, patients..." />
           </div>
           <div className="ph-header-date">{today}</div>
+
+          {/* Clickable profile avatar with hover tooltip */}
+          <div className="ph-profile-wrap">
+            <div className="ph-profile-avatar" onClick={() => setShowProfile(true)}>
+              {abb}
+              <div className="ph-profile-tooltip">
+                <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{pharmacistName}</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Lead Pharmacist</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>pharmacy@vexoo.in</div>
+                <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {screenEl}
       </div>
+
+      {/* ── Profile Modal ── */}
+      {showProfile && (
+        <div onClick={() => setShowProfile(false)} style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:200, backdropFilter:'blur(2px)'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:'white', borderRadius:16, padding:28,
+            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)',
+            border:'1px solid var(--border)'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
+              <div style={{ width:60, height:60, borderRadius:'50%',
+                background:'linear-gradient(135deg,var(--primary),#0891b2)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:17 }}>{pharmacistName}</div>
+                <div style={{ fontSize:13, color:'var(--muted)' }}>Lead Pharmacist · Pharmacy Portal</div>
+              </div>
+            </div>
+            {[['Full Name', pharmacistName], ['Email', 'pharmacy@vexoo.in'], ['Phone', '+91 98765 43210'], ['Licence No.', 'PH/2020/MH/04182'], ['Role', 'Lead Pharmacist']].map(([label, val]) => (
+              <div key={label} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>{label}</div>
+                <input defaultValue={val} style={{
+                  width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
+                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
+                  color:'var(--text)', background:'var(--bg)'
+                }} />
+              </div>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setShowProfile(false)} style={{
+                flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)',
+                background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
+              }}>Close</button>
+              <button style={{
+                flex:1, padding:'10px', borderRadius:10, border:'none',
+                background:'var(--primary)', color:'white', cursor:'pointer',
+                fontFamily:'inherit', fontSize:13.5, fontWeight:600
+              }}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

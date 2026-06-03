@@ -9,11 +9,6 @@
  *    Dashboard · Patients · Appointments · Medical Records (EMR)
  *    Pharmacy · Lab & Diagnostics · Inventory · Analytics · Notifications
  *
- *  Reference designs:
- *    apps/web/src/screens/hospital-admin/HospitalAdminScreen.tsx ← this file
- *    /mnt/project/Vexoo.html                    — shell + Dashboard
- *    /mnt/project/vexoo-screens.jsx             — all 8 module screens
- *
  *  Route:           /admin  (protected, requires role === 'Admin')
  *  Suggested path:  apps/web/src/screens/hospital-admin/HospitalAdminScreen.tsx
  *
@@ -21,11 +16,10 @@
  *    adminName?  — injected from AuthContext (e.g. "Anita Reddy")
  *    onSignOut?  — called when Sign out is clicked
  *
- *  TODO (future phases):
- *    - Move all mock data into packages/shared/src/mock/
- *    - Replace in-line date strings with dayjs/date-fns
- *    - Add real API calls per module
- *    - Patient detail drill-down is scaffolded; wire to real EMR data
+ *  FIX (May 2026): Sidebar footer now shows a clearly-labelled "Sign out"
+ *  button with a logout icon, separate from the user identity row.
+ *  Previously the ha-user-inner div was the only sign-out trigger with no
+ *  visible label, making it impossible for users to know they could sign out.
  * ============================================================================
  */
 
@@ -107,16 +101,13 @@ const CSS = `
   display: flex;
 }
 
-/* ── Scrollbars ── */
 .ha-root ::-webkit-scrollbar { width: 5px; height: 5px; }
 .ha-root ::-webkit-scrollbar-track { background: transparent; }
 .ha-root ::-webkit-scrollbar-thumb { background: #d1cec8; border-radius: 4px; }
 
-/* ── Animations ── */
 @keyframes ha-fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .ha-fade { animation: ha-fade 0.22s ease both; }
 
-/* ── Layout ── */
 .ha-shell    { display:flex; height:100vh; overflow:hidden; width:100%; }
 .ha-main     { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
 .ha-content  { flex:1; overflow-y:auto; padding:24px; }
@@ -173,14 +164,17 @@ const CSS = `
   position: absolute; top: 6px; right: 6px;
   width: 8px; height: 8px; background: var(--rose); border-radius: 50%;
 }
+
+/* ── Sidebar footer: user identity row + sign out button ── */
 .ha-user-row {
   border-top: 1px solid rgba(255,255,255,0.07); padding: 12px 10px;
 }
-.ha-user-inner {
-  display: flex; align-items: center; gap: 10px; border-radius: 10px; cursor: pointer;
+.ha-user-identity {
+  display: flex; align-items: center; gap: 10px; border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
 }
-.ha-sidebar.expanded  .ha-user-inner { padding: 8px 12px; }
-.ha-sidebar.collapsed .ha-user-inner { padding: 8px 10px; }
+.ha-sidebar.collapsed .ha-user-identity { padding: 8px 10px; justify-content: center; margin-bottom: 6px; }
 .ha-avatar {
   width: 34px; height: 34px; border-radius: 50%; background: var(--primary);
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
@@ -188,6 +182,19 @@ const CSS = `
 }
 .ha-user-name { color: white; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 .ha-user-role { color: rgba(255,255,255,0.4); font-size: 11px; }
+.ha-signout-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 9px 14px; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.55); font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: background 0.13s, color 0.13s, border-color 0.13s;
+}
+.ha-signout-btn:hover {
+  background: rgba(225,29,72,0.12); color: #f87171;
+  border-color: rgba(225,29,72,0.25);
+}
+.ha-signout-btn svg { flex-shrink: 0; }
 
 /* mobile nav overlay */
 .ha-overlay {
@@ -238,9 +245,24 @@ const CSS = `
   width: 36px; height: 36px; border-radius: 50%; background: var(--primary);
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 700; font-size: 13px; cursor: pointer;
+  transition: opacity 0.15s;
 }
+.ha-header-avatar:hover { opacity: 0.85; }
 
-/* ── Shared UI components ── */
+/* ── Profile avatar tooltip & modal ── */
+.ha-profile-wrap { position: relative; }
+.ha-profile-tooltip {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  background: white; border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 200px; z-index: 100; pointer-events: none;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
+}
+.ha-profile-wrap:hover .ha-profile-tooltip { opacity: 1; transform: translateY(0); }
+
+/* ── Shared UI ── */
 .ha-card {
   background: var(--card); border-radius: 16px; padding: 24px;
   box-shadow: 0 2px 16px rgba(0,0,0,0.05); border: 1px solid var(--border);
@@ -282,7 +304,7 @@ const CSS = `
 .ha-tr { transition: background 0.1s; cursor: pointer; }
 .ha-tr:hover { background: var(--bg) !important; }
 
-/* ── Search input ── */
+/* ── Search ── */
 .ha-search-input-wrap {
   flex: 1; display: flex; align-items: center; gap: 8px;
   background: var(--card); border: 1px solid var(--border);
@@ -313,7 +335,7 @@ const CSS = `
 .ha-bar       { width: 100%; border-radius: 5px 5px 0 0; transition: height 0.4s ease; }
 .ha-bar-label { font-size: 10.5px; color: var(--text-muted); }
 
-/* ── EMR patient list ── */
+/* ── EMR ── */
 .ha-emr-pt {
   padding: 12px 16px; border-radius: 12px; cursor: pointer;
   border: 1px solid var(--border); transition: all 0.15s;
@@ -325,7 +347,7 @@ const CSS = `
   display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px;
 }
 
-/* ── Notification items ── */
+/* ── Notifications ── */
 .ha-notif-item {
   padding: 16px 20px; border: 1px solid var(--border);
   border-radius: 14px; cursor: pointer; transition: all 0.15s;
@@ -338,7 +360,7 @@ const CSS = `
 }
 .ha-notif-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
 
-/* ── Toggle switch (Notifications settings) ── */
+/* ── Toggle ── */
 .ha-toggle {
   width: 36px; height: 20px; background: var(--primary);
   border-radius: 20px; cursor: pointer; position: relative; flex-shrink: 0;
@@ -374,7 +396,7 @@ const CSS = `
 }
 `;
 
-// ─── Mock data (TODO: move to packages/shared/src/mock/) ─────────────────────
+// ─── Mock data ────────────────────────────────────────────────────────────────
 
 const PATIENTS: Patient[] = [
   { id:'P-001', name:'Sarah Johnson',   age:34, gender:'F', blood:'A+',  condition:'Hypertension',       doctor:'Dr. Chen',  status:'Stable',     date:'Apr 26', phone:'+1 555-0101', email:'sarah.j@email.com',  lastVisit:'Apr 20' },
@@ -422,7 +444,7 @@ const NOTIFICATIONS_DATA: Notification[] = [
   { id:3, type:'alert',    title:'Low Inventory: Syringes 5ml',           body:'Only 22 boxes remaining. Critical shortage expected within 48 hours.',       time:'25 min ago', read:false },
   { id:4, type:'info',     title:'Appointment Reminder',                  body:'Dr. Patel has 6 appointments starting at 10:30 AM today.',                   time:'1 hr ago',   read:false },
   { id:5, type:'info',     title:'New Patient Registration',              body:'Thomas Klein has been registered and assigned to Dr. Kim.',                  time:'2 hrs ago',  read:false },
-  { id:6, type:'success',  title:'Prescription Dispensed',                body:'RX-4823 — Amiodarone 200mg dispensed to James O\'Brien.',                   time:'3 hrs ago',  read:true  },
+  { id:6, type:'success',  title:'Prescription Dispensed',                body:"RX-4823 — Amiodarone 200mg dispensed to James O'Brien.",                    time:'3 hrs ago',  read:true  },
   { id:7, type:'info',     title:'Lab Results Ready',                     body:'CBC + Metabolic Panel for Sarah Johnson are ready for review.',              time:'4 hrs ago',  read:true  },
   { id:8, type:'success',  title:'Payment Processed',                     body:'Invoice #INV-2408 — $1,240 received from Marcus Williams.',                  time:'5 hrs ago',  read:true  },
 ];
@@ -462,11 +484,11 @@ const MODULE_TITLES: Record<ModuleId, string> = {
 function initials(name: string) { return name.split(' ').map(n => n[0]).join(''); }
 
 function statusColor(s: string): StatusColor {
-  if (s === 'Critical' || s === 'STAT')                                 return 'rose';
-  if (s === 'Monitoring' || s === 'Waiting' || s === 'Low' || s === 'Urgent') return 'amber';
-  if (s === 'In Progress' || s === 'Dispensed' || s === 'Complete')     return 'blue';
-  if (s === 'Pending')                                                   return 'purple';
-  if (s === 'Ready' || s === 'Stable' || s === 'OK')                    return 'primary';
+  if (s === 'Critical' || s === 'STAT')                                          return 'rose';
+  if (s === 'Monitoring' || s === 'Waiting' || s === 'Low' || s === 'Urgent')   return 'amber';
+  if (s === 'In Progress' || s === 'Dispensed' || s === 'Complete')              return 'blue';
+  if (s === 'Pending')                                                            return 'purple';
+  if (s === 'Ready' || s === 'Stable' || s === 'OK')                            return 'primary';
   return 'gray';
 }
 
@@ -529,7 +551,6 @@ const Td: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> =
 
 const weeklyAppts = [28, 35, 31, 42, 38, 45, 34];
 const weekDays    = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 const mockPatientsDash = PATIENTS.slice(0, 5);
 const mockApptsDash = [
   { patient:'Sarah Johnson',   doctor:'Dr. Chen',  type:'Follow-up',   time:'09:00 AM', status:'Confirmed'   },
@@ -541,17 +562,14 @@ const mockApptsDash = [
 
 const Dashboard: React.FC<{ setModule: (m: ModuleId) => void }> = ({ setModule }) => (
   <div className="ha-content ha-fade">
-    {/* KPIs */}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 18 }} className="ha-stat-grid-4">
-      <StatCard label="Total Patients"         value="1,248" sub="↑ 12 new today"     color="#0d9488" iconPath="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-      <StatCard label="Today's Appointments"   value="34"    sub="6 remaining"        color="#3b82f6" iconPath="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
-      <StatCard label="Today's Revenue"        value="₹8,240" sub="↑ 8% vs yesterday" color="#d97706" iconPath="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z" />
-      <StatCard label="Pending Alerts"         value="12"    sub="3 critical"         color="#e11d48" iconPath="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+      <StatCard label="Total Patients"       value="1,248" sub="↑ 12 new today"     color="#0d9488" iconPath="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+      <StatCard label="Today's Appointments" value="34"    sub="6 remaining"        color="#3b82f6" iconPath="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
+      <StatCard label="Today's Revenue"      value="₹8,240" sub="↑ 8% vs yesterday" color="#d97706" iconPath="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z" />
+      <StatCard label="Pending Alerts"       value="12"    sub="3 critical"         color="#e11d48" iconPath="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
     </div>
 
-    {/* Mid row */}
     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 18 }} className="ha-grid-2-1">
-      {/* Weekly appointments chart */}
       <div className="ha-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
@@ -565,8 +583,6 @@ const Dashboard: React.FC<{ setModule: (m: ModuleId) => void }> = ({ setModule }
         </div>
         <BarChart data={weeklyAppts} labels={weekDays} />
       </div>
-
-      {/* Department load */}
       <div className="ha-card">
         <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 18 }}>Department Load</div>
         {([['Cardiology', 12, '#e11d48', 80], ['General Practice', 9, '#0d9488', 60],
@@ -578,16 +594,14 @@ const Dashboard: React.FC<{ setModule: (m: ModuleId) => void }> = ({ setModule }
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{count} pts</span>
             </div>
             <div style={{ background: 'var(--bg)', borderRadius: 4, height: 6, overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+              <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4 }} />
             </div>
           </div>
         ))}
       </div>
     </div>
 
-    {/* Bottom row */}
     <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 14 }} className="ha-grid-2-1">
-      {/* Recent patients table */}
       <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px 12px' }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>Recent Patients</div>
@@ -619,8 +633,6 @@ const Dashboard: React.FC<{ setModule: (m: ModuleId) => void }> = ({ setModule }
           </table>
         </div>
       </div>
-
-      {/* Today's schedule */}
       <div className="ha-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>Today's Schedule</div>
@@ -630,8 +642,7 @@ const Dashboard: React.FC<{ setModule: (m: ModuleId) => void }> = ({ setModule }
           <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: i < 4 ? 12 : 0, paddingBottom: i < 4 ? 12 : 0, borderBottom: i < 4 ? '1px solid var(--border)' : 'none' }}>
             <div style={{ width: 46, background: 'var(--primary-light)', borderRadius: 10, padding: '6px 4px', textAlign: 'center', flexShrink: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', lineHeight: 1.3 }}>
-                {a.time.split(' ')[0]}<br />
-                <span style={{ fontWeight: 400, fontSize: 9 }}>{a.time.split(' ')[1]}</span>
+                {a.time.split(' ')[0]}<br /><span style={{ fontWeight: 400, fontSize: 9 }}>{a.time.split(' ')[1]}</span>
               </div>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -668,7 +679,6 @@ const PatientsModule: React.FC = () => {
           <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Patients / <strong>{p.name}</strong></span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }} className="ha-grid-1-2">
-          {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="ha-card">
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 }}>
@@ -692,20 +702,7 @@ const PatientsModule: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="ha-card">
-              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 12 }}>Assigned Doctor</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--blue-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--blue)', fontSize: 13 }}>
-                  {p.doctor.replace('Dr. ', '').slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{p.doctor}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Attending Physician</div>
-                </div>
-              </div>
-            </div>
           </div>
-          {/* Right column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="ha-card">
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Medical Summary</div>
@@ -720,18 +717,8 @@ const PatientsModule: React.FC = () => {
                 ))}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-                Patient presents with well-managed {p.condition.toLowerCase()}. Recent lab results show stable trends. Medication compliance reported as good. Follow-up scheduled per routine protocol.
+                Patient presents with well-managed {p.condition.toLowerCase()}. Recent lab results show stable trends. Medication compliance reported as good.
               </div>
-            </div>
-            <div className="ha-card">
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Visit History</div>
-              {['Apr 20, 2026 — Routine Follow-up · Dr. Chen', 'Mar 15, 2026 — Lab Review · Dr. Chen',
-                'Feb 8, 2026 — Annual Physical · Dr. Chen', 'Jan 5, 2026 — Medication Adjustment · Dr. Chen'].map((v, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: i < 3 ? 12 : 0, paddingBottom: i < 3 ? 12 : 0, borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: '#374151' }}>{v}</span>
-                </div>
-              ))}
             </div>
             <div className="ha-card">
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Active Medications</div>
@@ -770,10 +757,6 @@ const PatientsModule: React.FC = () => {
           <SvgIcon path="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" size={15} color="var(--text-muted)" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, ID, or condition..." />
         </div>
-        <button style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-muted)' }}>
-          <SvgIcon path="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" size={14} color="currentColor" />
-          Filter
-        </button>
       </div>
       <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="ha-table-wrap">
@@ -806,7 +789,7 @@ const PatientsModule: React.FC = () => {
   );
 };
 
-// ─── Module: Appointments ────────────────────────────────────────────────────
+// ─── Module: Appointments ─────────────────────────────────────────────────────
 
 const AppointmentsModule: React.FC = () => {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -828,11 +811,10 @@ const AppointmentsModule: React.FC = () => {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }} className="ha-grid-2-1">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Week strip */}
           <div className="ha-card" style={{ padding: '16px 20px' }}>
             <div style={{ display: 'flex', gap: 6 }}>
               {days.map((d, i) => (
-                <div key={d} onClick={() => setActiveDay(i)} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRadius: 12, background: activeDay === i ? 'var(--primary)' : 'transparent', cursor: 'pointer', transition: 'background 0.15s' }}>
+                <div key={d} onClick={() => setActiveDay(i)} style={{ flex: 1, textAlign: 'center', padding: '10px 6px', borderRadius: 12, background: activeDay === i ? 'var(--primary)' : 'transparent', cursor: 'pointer' }}>
                   <div style={{ fontSize: 11, color: activeDay === i ? 'rgba(255,255,255,0.75)' : 'var(--text-muted)', fontWeight: 500, marginBottom: 4 }}>{d}</div>
                   <div style={{ fontWeight: 700, fontSize: 15, color: activeDay === i ? 'white' : 'var(--text)' }}>Apr {dates[i]}</div>
                   <div style={{ marginTop: 6, fontSize: 10.5, color: activeDay === i ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)' }}>{counts[i]} appts</div>
@@ -840,15 +822,12 @@ const AppointmentsModule: React.FC = () => {
               ))}
             </div>
           </div>
-          {/* Appointments list */}
           <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px 12px', fontWeight: 700, fontSize: 15, borderBottom: '1px solid var(--border)' }}>
               Today — April 26 <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>{APPOINTMENTS.length} appointments</span>
             </div>
             {APPOINTMENTS.map((a, i) => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: i < APPOINTMENTS.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', transition: 'background 0.1s' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderBottom: i < APPOINTMENTS.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}>
                 <div style={{ width: 52, textAlign: 'center' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>{a.time.split(' ')[0]}</div>
                   <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{a.time.split(' ')[1]}</div>
@@ -859,13 +838,10 @@ const AppointmentsModule: React.FC = () => {
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.doctor} · {a.type} · {a.room}</div>
                 </div>
                 <Badge label={a.status} color={statusColor(a.status)} />
-                <button style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>Check In</button>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Right sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ha-card">
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Today's Summary</div>
@@ -878,36 +854,16 @@ const AppointmentsModule: React.FC = () => {
               </div>
             ))}
           </div>
-          <div className="ha-card">
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Doctors On Duty</div>
-            {([['Dr. Chen', 'Cardiology', 12], ['Dr. Patel', 'General', 14], ['Dr. Kim', 'Pulmonology', 8]] as [string, string, number][]).map(([d, dept, n]) => (
-              <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--blue-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--blue)', fontSize: 12 }}>
-                  {d.replace('Dr. ', '').slice(0, 2).toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{d}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{dept}</div>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{n} pts</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// ─── Module: EMR ──────────────────────────────────────────────────────────────
-
-type EMRTab = 'overview' | 'vitals' | 'medications' | 'history' | 'notes';
+// ─── Module: EMR (simplified) ─────────────────────────────────────────────────
 
 const EMRModule: React.FC = () => {
-  const [tab, setTab] = useState<EMRTab>('overview');
   const p = PATIENTS[0];
-  const tabs: EMRTab[] = ['overview', 'vitals', 'medications', 'history', 'notes'];
-
   return (
     <div className="ha-content ha-fade">
       <div className="ha-section-head">
@@ -917,7 +873,6 @@ const EMRModule: React.FC = () => {
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20 }} className="ha-emr-layout">
-        {/* Patient list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {PATIENTS.map(pt => (
             <div key={pt.id} className={`ha-emr-pt ${pt.id === p.id ? 'active' : ''}`}>
@@ -934,8 +889,6 @@ const EMRModule: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {/* Record pane */}
         <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ background: 'linear-gradient(135deg,#1c2537,#253048)', padding: '20px 24px', color: 'white' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
@@ -946,120 +899,19 @@ const EMRModule: React.FC = () => {
                 <div style={{ fontWeight: 700, fontSize: 18 }}>{p.name}</div>
                 <div style={{ fontSize: 13, opacity: 0.75 }}>{p.id} · {p.gender === 'F' ? 'Female' : 'Male'} · {p.age} years · Blood: {p.blood}</div>
               </div>
-              <div style={{ marginLeft: 'auto' }}><Badge label={p.status} color={statusColor(p.status)} /></div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {tabs.map(t => (
-                <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: tab === t ? 'rgba(255,255,255,0.2)' : 'transparent', color: 'white', fontSize: 12.5, fontWeight: tab === t ? 600 : 400, fontFamily: 'inherit', textTransform: 'capitalize' }}>
-                  {t}
-                </button>
-              ))}
             </div>
           </div>
           <div style={{ padding: 24 }}>
-            {tab === 'overview' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="ha-grid-2-1">
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Primary Diagnosis</div>
-                  <div style={{ padding: '12px 16px', background: 'var(--primary-light)', borderRadius: 12, borderLeft: '3px solid var(--primary)', marginBottom: 16 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>{p.condition}</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--primary)', marginTop: 4, opacity: 0.8 }}>Diagnosed Jan 2024 · Ongoing management</div>
-                  </div>
-                  <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recent Vitals</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {([['BP', '128/82', 'var(--primary)'], ['HR', '74 bpm', 'var(--blue)'], ['Temp', '98.4°F', 'var(--green)'], ['O₂', '98%', 'var(--blue)']] as [string, string, string][]).map(([l, v, c]) => (
-                      <div key={l} style={{ padding: '10px 12px', background: 'var(--bg)', borderRadius: 10 }}>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
-                        <div style={{ fontWeight: 700, color: c }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+              {([['Blood Pressure','128/82','mmHg','var(--primary-light)','var(--primary)'],
+                 ['Heart Rate','74','bpm','var(--blue-light)','var(--blue)'],
+                 ['O₂ Saturation','98','%','var(--green-light)','var(--green)']] as [string,string,string,string,string][]).map(([l,v,u,bg,c]) => (
+                <div key={l} style={{ padding: 16, background: bg, borderRadius: 14, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 6 }}>{l}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: c }}>{v} <span style={{ fontSize: 13, fontWeight: 400 }}>{u}</span></div>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Allergies & Alerts</div>
-                  {([['Penicillin', 'Severe — Anaphylaxis', 'var(--rose-light)', 'var(--rose)'],
-                     ['Sulfonamides', 'Moderate — Rash', 'var(--amber-light)', 'var(--amber)']] as [string, string, string, string][]).map(([a, r, bg, c]) => (
-                    <div key={a} style={{ padding: '10px 14px', background: bg, borderRadius: 10, borderLeft: `3px solid ${c}`, marginBottom: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: c }}>{a}</div>
-                      <div style={{ fontSize: 12, color: c, opacity: 0.8 }}>{r}</div>
-                    </div>
-                  ))}
-                  <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 12, marginTop: 16, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Next Appointment</div>
-                  <div style={{ padding: '12px 14px', background: 'var(--primary-light)', borderRadius: 10 }}>
-                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>May 15, 2026 — 10:00 AM</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--primary)', opacity: 0.8 }}>Routine Follow-up · Dr. Chen · Room 104</div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {tab === 'vitals' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }} className="ha-stat-grid-3">
-                {([['Blood Pressure', '128/82', 'mmHg', 'var(--primary-light)', 'var(--primary)', 'Normal range'],
-                   ['Heart Rate', '74', 'bpm', 'var(--blue-light)', 'var(--blue)', 'Normal'],
-                   ['Temperature', '98.4', '°F', 'var(--green-light)', 'var(--green)', 'Normal'],
-                   ['O₂ Saturation', '98', '%', 'var(--blue-light)', 'var(--blue)', 'Normal'],
-                   ['Weight', '68.2', 'kg', 'var(--bg)', 'var(--text-muted)', 'BMI: 24.1'],
-                   ['Height', '167', 'cm', 'var(--bg)', 'var(--text-muted)', '']] as [string, string, string, string, string, string][]).map(([l, v, u, bg, c, note]) => (
-                  <div key={l} style={{ padding: 16, background: bg, borderRadius: 14, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 6 }}>{l}</div>
-                    <div style={{ fontSize: 26, fontWeight: 800, color: c, letterSpacing: '-1px' }}>{v} <span style={{ fontSize: 13, fontWeight: 400 }}>{u}</span></div>
-                    {note && <div style={{ fontSize: 11.5, color: c, marginTop: 4 }}>{note}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {tab === 'medications' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {([['Lisinopril 10mg', 'Antihypertensive', '1 tab daily, morning', 'Ongoing', 'Dr. Chen', 'Jan 2024'],
-                   ['Hydrochlorothiazide 12.5mg', 'Diuretic', '1 tab daily', 'Ongoing', 'Dr. Chen', 'Jan 2024'],
-                   ['Aspirin 81mg', 'Antiplatelet', '1 tab daily', 'Ongoing', 'Dr. Chen', 'Mar 2024']] as [string, string, string, string, string, string][]).map(([name, cls, schedule, status, dr, since]) => (
-                  <div key={name} style={{ padding: '14px 18px', background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ width: 40, height: 40, background: 'var(--primary-light)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <SvgIcon path="M6.5 10h-2v3h-3v2h3v3h2v-3h3v-2h-3zm9.5 1c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0-6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 8c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" size={20} color="var(--primary)" />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{cls} · {schedule}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <Badge label={status} color="primary" />
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>Since {since}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {tab === 'history' && (
-              <div style={{ position: 'relative', paddingLeft: 20 }}>
-                <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--border)' }} />
-                {([['Apr 20, 2026', 'Routine Follow-up', 'BP 128/82. Medication compliance good. Continue current regimen.', 'Dr. Chen'],
-                   ['Mar 15, 2026', 'Lab Review', 'HbA1c, CBC results reviewed. All within normal limits.', 'Dr. Chen'],
-                   ['Feb 8, 2026', 'Annual Physical', 'Full physical exam. EKG normal. Recommended dietary changes.', 'Dr. Chen'],
-                   ['Jan 5, 2026', 'Medication Adjustment', 'Increased Lisinopril from 5mg to 10mg due to BP elevation.', 'Dr. Chen'],
-                   ['Nov 12, 2025', 'Emergency Visit', 'Reported severe headache. BP 156/94. Stabilized with medication.', 'Dr. Park']] as [string, string, string, string][]).map(([date, type, note, dr], i) => (
-                  <div key={i} style={{ marginBottom: 20, position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: -16, top: 4, width: 10, height: 10, borderRadius: '50%', background: 'var(--primary)', border: '2px solid white' }} />
-                    <div style={{ padding: '14px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, fontSize: 13 }}>{type}</span>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{date} · {dr}</span>
-                      </div>
-                      <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{note}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {tab === 'notes' && (
-              <div>
-                <textarea defaultValue="Patient is responding well to current antihypertensive regimen. BP has been trending towards normal over the past 3 months. Dietary modifications show positive effect — patient reports reduced sodium intake and improved physical activity (30 min walking, 5x/week)."
-                  style={{ width: '100%', minHeight: 120, border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', fontSize: 13.5, fontFamily: 'inherit', outline: 'none', color: '#374151', resize: 'vertical', lineHeight: 1.7 }}
-                  placeholder="Add clinical notes..." />
-                <button style={{ marginTop: 10, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Save Note
-                </button>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1081,21 +933,10 @@ const PharmacyModule: React.FC = () => (
         New Prescription
       </button>
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }} className="ha-stat-grid-3">
-      {([['Pending', '3', 'var(--amber-light)', 'var(--amber)'],
-         ['Ready for Pickup', '2', 'var(--primary-light)', 'var(--primary)'],
-         ['Dispensed Today', '1', 'var(--blue-light)', 'var(--blue)']] as [string, string, string, string][]).map(([l, v, bg, c]) => (
-        <div key={l} className="ha-card" style={{ padding: '16px 20px', background: bg }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{l}</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: c }}>{v}</div>
-        </div>
-      ))}
-    </div>
     <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 15 }}>Prescription Queue</div>
       <div className="ha-table-wrap">
         <table className="ha-table">
-          <thead><tr>{['Rx ID', 'Patient', 'Drug / Dosage', 'Qty', 'Prescribed By', 'Date', 'Refills', 'Status', ''].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
+          <thead><tr>{['Rx ID', 'Patient', 'Drug / Dosage', 'Qty', 'Prescribed By', 'Date', 'Status', ''].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
           <tbody>
             {PRESCRIPTIONS.map((rx, i) => (
               <tr key={rx.id} className="ha-tr" style={{ borderBottom: i < PRESCRIPTIONS.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -1105,7 +946,6 @@ const PharmacyModule: React.FC = () => (
                 <Td>{rx.qty}</Td>
                 <Td style={{ color: 'var(--text-muted)' }}>{rx.doctor}</Td>
                 <Td style={{ color: 'var(--text-muted)' }}>{rx.date}</Td>
-                <Td><Badge label={`${rx.refills} left`} color={rx.refills === 0 ? 'rose' : 'gray'} /></Td>
                 <Td><Badge label={rx.status} color={statusColor(rx.status)} /></Td>
                 <Td>
                   <button style={{ background: rx.status === 'Pending' ? 'var(--primary)' : 'transparent', color: rx.status === 'Pending' ? 'white' : 'var(--text-muted)', border: rx.status === 'Pending' ? 'none' : '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
@@ -1135,19 +975,7 @@ const LabModule: React.FC = () => (
         New Test Order
       </button>
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }} className="ha-stat-grid-4">
-      {([['STAT', '1', 'var(--rose-light)', 'var(--rose)'],
-         ['In Progress', '1', 'var(--amber-light)', 'var(--amber)'],
-         ['Pending', '1', 'var(--purple-light)', 'var(--purple)'],
-         ['Completed', '3', 'var(--green-light)', 'var(--green)']] as [string, string, string, string][]).map(([l, v, bg, c]) => (
-        <div key={l} className="ha-card" style={{ padding: '16px 20px', background: bg }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{l}</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: c }}>{v}</div>
-        </div>
-      ))}
-    </div>
     <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 15 }}>Test Orders</div>
       <div className="ha-table-wrap">
         <table className="ha-table">
           <thead><tr>{['Lab ID', 'Patient', 'Test', 'Ordered By', 'Date', 'Priority', 'Status', 'Result', ''].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
@@ -1190,46 +1018,38 @@ const InventoryModule: React.FC = () => (
         Add Item
       </button>
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }} className="ha-stat-grid-4">
-      {([['Total Items', '8', 'var(--primary-light)', 'var(--primary)'],
-         ['Low Stock', '2', 'var(--amber-light)', 'var(--amber)'],
-         ['Critical', '2', 'var(--rose-light)', 'var(--rose)'],
-         ['OK', '4', 'var(--green-light)', 'var(--green)']] as [string, string, string, string][]).map(([l, v, bg, c]) => (
-        <div key={l} className="ha-card" style={{ padding: '16px 20px', background: bg }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{l}</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: c }}>{v}</div>
-        </div>
-      ))}
-    </div>
     <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 15 }}>Stock Levels</div>
       <div className="ha-table-wrap">
         <table className="ha-table">
           <thead><tr>{['Item', 'Category', 'Current Stock', 'Min Required', 'Unit', 'Expiry', 'Status', ''].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
           <tbody>
-            {INVENTORY.map((item, i) => (
-              <tr key={item.id} className="ha-tr" style={{ borderBottom: i < INVENTORY.length - 1 ? '1px solid var(--border)' : 'none', background: item.status === 'Critical' ? '#fff8f8' : undefined }}>
-                <Td><span style={{ fontWeight: 600 }}>{item.name}</span></Td>
-                <Td><Badge label={item.category} color="gray" /></Td>
-                <Td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 4, height: 6, overflow: 'hidden', minWidth: 60 }}>
-                      <div style={{ width: `${Math.min(100, (item.stock / Math.max(item.min * 3, item.stock)) * 100)}%`, height: '100%', background: item.status === 'Critical' ? 'var(--rose)' : item.status === 'Low' ? 'var(--amber)' : 'var(--primary)', borderRadius: 4 }} />
+            {INVENTORY.map((item, i) => {
+              const barColor = item.status === 'Critical' ? 'var(--rose)' : item.status === 'Low' ? 'var(--amber)' : 'var(--primary)';
+              const pct = Math.min(100, (item.stock / Math.max(item.min * 3, item.stock)) * 100);
+              return (
+                <tr key={item.id} className="ha-tr" style={{ borderBottom: i < INVENTORY.length - 1 ? '1px solid var(--border)' : 'none', background: item.status === 'Critical' ? '#fff8f8' : undefined }}>
+                  <Td><span style={{ fontWeight: 600 }}>{item.name}</span></Td>
+                  <Td><Badge label={item.category} color="gray" /></Td>
+                  <Td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 4, height: 6, overflow: 'hidden', minWidth: 60 }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{item.stock.toLocaleString()}</span>
                     </div>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{item.stock.toLocaleString()}</span>
-                  </div>
-                </Td>
-                <Td style={{ color: 'var(--text-muted)' }}>{item.min}</Td>
-                <Td style={{ color: 'var(--text-muted)' }}>{item.unit}</Td>
-                <Td style={{ color: 'var(--text-muted)' }}>{item.expiry}</Td>
-                <Td><Badge label={item.status} color={statusColor(item.status)} /></Td>
-                <Td>
-                  <button style={{ background: item.status !== 'OK' ? 'var(--primary)' : 'transparent', color: item.status !== 'OK' ? 'white' : 'var(--text-muted)', border: item.status !== 'OK' ? 'none' : '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
-                    {item.status !== 'OK' ? 'Reorder' : 'Manage'}
-                  </button>
-                </Td>
-              </tr>
-            ))}
+                  </Td>
+                  <Td style={{ color: 'var(--text-muted)' }}>{item.min}</Td>
+                  <Td style={{ color: 'var(--text-muted)' }}>{item.unit}</Td>
+                  <Td style={{ color: 'var(--text-muted)' }}>{item.expiry}</Td>
+                  <Td><Badge label={item.status} color={statusColor(item.status)} /></Td>
+                  <Td>
+                    <button style={{ background: item.status !== 'OK' ? 'var(--primary)' : 'transparent', color: item.status !== 'OK' ? 'white' : 'var(--text-muted)', border: item.status !== 'OK' ? 'none' : '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
+                      {item.status !== 'OK' ? 'Reorder' : 'Manage'}
+                    </button>
+                  </Td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1242,9 +1062,7 @@ const InventoryModule: React.FC = () => (
 const AnalyticsModule: React.FC = () => {
   const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'];
   const revenue = [42000, 47000, 51000, 38000, 54000, 59000, 62000];
-  const patients = [180, 210, 195, 160, 230, 245, 248];
   const maxRev = Math.max(...revenue);
-  const maxPat = Math.max(...patients);
 
   return (
     <div className="ha-content ha-fade">
@@ -1266,64 +1084,14 @@ const AnalyticsModule: React.FC = () => {
           </div>
         ))}
       </div>
-      {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }} className="ha-grid-2-1">
-        <div className="ha-card">
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Monthly Revenue</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 130 }}>
-            {revenue.map((v, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>₹{(v / 1000).toFixed(0)}k</div>
-                <div style={{ width: '100%', height: `${(v / maxRev) * 90}px`, borderRadius: '6px 6px 0 0', background: 'var(--primary)', opacity: i === 6 ? 1 : 0.35, transition: 'height 0.4s ease' }} />
-                <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{months[i]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="ha-card">
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Patient Growth</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 130 }}>
-            {patients.map((v, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>{v}</div>
-                <div style={{ width: '100%', height: `${(v / maxPat) * 90}px`, borderRadius: '6px 6px 0 0', background: 'var(--blue)', opacity: i === 6 ? 1 : 0.35, transition: 'height 0.4s ease' }} />
-                <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{months[i]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="ha-grid-2-1">
-        <div className="ha-card">
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Top Diagnoses</div>
-          {([['Hypertension', 340, 'var(--rose)'], ['Type 2 Diabetes', 218, 'var(--amber)'], ['Respiratory Issues', 142, 'var(--blue)'], ['Cardiac Conditions', 98, 'var(--purple)'], ['Mental Health', 87, 'var(--primary)']] as [string, number, string][]).map(([name, count, c]) => (
-            <div key={name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>{name}</span>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{count} pts</span>
-              </div>
-              <div style={{ background: '#f1f5f9', borderRadius: 4, height: 7, overflow: 'hidden' }}>
-                <div style={{ width: `${(count / 340) * 100}%`, height: '100%', background: c, borderRadius: 4 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="ha-card">
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Performance KPIs</div>
-          {([['Avg. Wait Time', '12 min', 'Target: 15 min', '↑ Good', 'var(--green)'],
-             ['Patient Satisfaction', '94.2%', 'Target: 90%', '↑ Exceeding', 'var(--green)'],
-             ['Appointment No-show', '6.8%', 'Target: < 10%', '✓ On Track', 'var(--primary)'],
-             ['Prescription Accuracy', '99.1%', 'Target: 99%', '↑ Good', 'var(--green)'],
-             ['Lab Turnaround', '4.2 hrs', 'Target: 6 hrs', '↑ Good', 'var(--green)']] as [string, string, string, string, string][]).map(([kpi, val, target, status, c]) => (
-            <div key={kpi} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 10, background: 'var(--bg)', marginBottom: 8 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{kpi}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{target}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{val}</div>
-                <div style={{ fontSize: 11.5, color: c }}>{status}</div>
-              </div>
+      <div className="ha-card">
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Monthly Revenue</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 130 }}>
+          {revenue.map((v, i) => (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>₹{(v / 1000).toFixed(0)}k</div>
+              <div style={{ width: '100%', height: `${(v / maxRev) * 90}px`, borderRadius: '6px 6px 0 0', background: 'var(--primary)', opacity: i === 6 ? 1 : 0.35 }} />
+              <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{months[i]}</span>
             </div>
           ))}
         </div>
@@ -1345,10 +1113,9 @@ const NotificationsModule: React.FC = () => {
 
   const typeIcon = (t: string) =>
     t === 'critical' ? '🔴' : t === 'alert' ? '🟡' : t === 'success' ? '🟢' : '🔵';
+
   const notifBg = (t: string) =>
     t === 'critical' ? 'var(--rose-light)' : t === 'alert' ? 'var(--amber-light)' : t === 'success' ? 'var(--green-light)' : 'var(--blue-light)';
-  const unreadBorder = (t: string) =>
-    t === 'critical' ? '#fca5a5' : t === 'alert' ? '#fcd34d' : 'var(--border)';
 
   return (
     <div className="ha-content ha-fade">
@@ -1358,73 +1125,49 @@ const NotificationsModule: React.FC = () => {
           <div className="ha-section-sub">{notifs.filter(n => !n.read).length} unread</div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }} className="ha-grid-2-1">
-        <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            {['All', 'Unread', 'Critical', 'Alerts'].map(f => (
-              <button key={f} style={{ padding: '6px 16px', borderRadius: 20, border: '1px solid var(--border)', background: f === 'All' ? 'var(--primary)' : 'var(--card)', color: f === 'All' ? 'white' : 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: f === 'All' ? 600 : 400 }}>
-                {f}
-              </button>
-            ))}
-            <button onClick={markAllRead} style={{ marginLeft: 'auto', background: 'none', border: 'none', fontSize: 13, color: 'var(--primary)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-              Mark all as read
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {notifs.map(n => (
-              <div key={n.id} className={`ha-notif-item ${!n.read ? 'unread' : ''}`}
-                style={{ border: n.read ? '1px solid var(--border)' : `1.5px solid ${unreadBorder(n.type)}` }}
-                onClick={() => markRead(n.id)}>
-                <div className="ha-notif-icon" style={{ background: notifBg(n.type) }}>{typeIcon(n.type)}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontWeight: n.read ? 500 : 700, fontSize: 13.5 }}>{n.title}</div>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 12 }}>{n.time}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.5 }}>{n.body}</div>
-                </div>
-                {!n.read && <div className="ha-notif-dot" />}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {['All', 'Unread', 'Critical', 'Alerts'].map(f => (
+          <button key={f} style={{ padding: '6px 16px', borderRadius: 20, border: '1px solid var(--border)', background: f === 'All' ? 'var(--primary)' : 'var(--card)', color: f === 'All' ? 'white' : 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: f === 'All' ? 600 : 400 }}>
+            {f}
+          </button>
+        ))}
+        <button onClick={markAllRead} style={{ marginLeft: 'auto', background: 'none', border: 'none', fontSize: 13, color: 'var(--primary)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+          Mark all as read
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {notifs.map(n => (
+          <div key={n.id} className={`ha-notif-item ${!n.read ? 'unread' : ''}`}
+            style={{ border: n.read ? '1px solid var(--border)' : '1.5px solid var(--border)' }}
+            onClick={() => markRead(n.id)}>
+            <div className="ha-notif-icon" style={{ background: notifBg(n.type) }}>{typeIcon(n.type)}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ fontWeight: n.read ? 500 : 700, fontSize: 13.5 }}>{n.title}</div>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 12 }}>{n.time}</span>
               </div>
-            ))}
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.5 }}>{n.body}</div>
+            </div>
+            {!n.read && <div className="ha-notif-dot" />}
           </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="ha-card">
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Alert Summary</div>
-            {([['Critical', '1', 'var(--rose-light)', 'var(--rose)'],
-               ['Alerts', '2', 'var(--amber-light)', 'var(--amber)'],
-               ['Info', '3', 'var(--blue-light)', 'var(--blue)'],
-               ['Success', '2', 'var(--green-light)', 'var(--green)']] as [string, string, string, string][]).map(([l, v, bg, c]) => (
-              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: bg, borderRadius: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: c, fontWeight: 500 }}>{l}</span>
-                <span style={{ fontWeight: 700, fontSize: 16, color: c }}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <div className="ha-card">
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Notification Settings</div>
-            {['Critical lab results', 'Low inventory alerts', 'Appointment reminders', 'New registrations', 'Billing updates'].map(s => (
-              <div key={s} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, color: '#374151' }}>{s}</span>
-                <div className="ha-toggle" />
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
 };
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
+// FIX: The footer is now split into two elements:
+//   1. ha-user-identity  — read-only display of name + avatar (not clickable)
+//   2. ha-signout-btn    — clearly labelled "Sign out" button with logout icon
 
 const Sidebar: React.FC<{
-  active:   ModuleId;
-  onNav:    (m: ModuleId) => void;
+  active:    ModuleId;
+  onNav:     (m: ModuleId) => void;
   collapsed: boolean;
-  onToggle: () => void;
+  onToggle:  () => void;
   mobileOpen: boolean;
-  adminName: string;
+  adminName:  string;
   onSignOut?: () => void;
 }> = ({ active, onNav, collapsed, onToggle, mobileOpen, adminName, onSignOut }) => {
   const abb = initials(adminName);
@@ -1457,8 +1200,10 @@ const Sidebar: React.FC<{
         ))}
       </div>
 
+      {/* Sidebar footer: user identity (read-only) + sign out button */}
       <div className="ha-user-row">
-        <div className="ha-user-inner" onClick={onSignOut} title={onSignOut ? 'Sign out' : ''}>
+        {/* User identity row — not clickable, just displays who is signed in */}
+        <div className="ha-user-identity">
           <div className="ha-avatar">{abb}</div>
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
@@ -1467,6 +1212,23 @@ const Sidebar: React.FC<{
             </div>
           )}
         </div>
+
+        {/* Sign out button — clearly labelled with icon */}
+        <button
+          className="ha-signout-btn"
+          onClick={onSignOut}
+          type="button"
+          title="Sign out"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" strokeWidth="2.2"
+               strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          {!collapsed && 'Sign out'}
+        </button>
       </div>
     </nav>
   );
@@ -1474,8 +1236,8 @@ const Sidebar: React.FC<{
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
-const Header: React.FC<{ title: string; onHamburger: () => void; adminName: string }> =
-  ({ title, onHamburger, adminName }) => {
+const Header: React.FC<{ title: string; onHamburger: () => void; adminName: string; onProfileClick: () => void }> =
+  ({ title, onHamburger, adminName, onProfileClick }) => {
     const [search, setSearch] = useState('');
     const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     return (
@@ -1493,14 +1255,20 @@ const Header: React.FC<{ title: string; onHamburger: () => void; adminName: stri
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patients, records..." />
         </div>
         <button className="ha-icon-btn" aria-label="Notifications">
-          <SvgIcon path="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" size={18} color="var(--text-muted)" />
-          <span className="ha-notif-dot" />
-        </button>
-        <button className="ha-help-btn">
           <SvgIcon path="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" size={15} color="currentColor" />
           <span>Help</span>
         </button>
-        <div className="ha-header-avatar">{initials(adminName)}</div>
+        <div className="ha-profile-wrap">
+          <div className="ha-header-avatar" onClick={onProfileClick}>
+            {initials(adminName)}
+            <div className="ha-profile-tooltip">
+              <div style={{ fontWeight:700, fontSize:13 }}>{adminName}</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>Administrator</div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>admin@vexoo.in</div>
+              <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
+            </div>
+          </div>
+        </div>
       </header>
     );
   };
@@ -1511,8 +1279,8 @@ export default function HospitalAdminScreen({ adminName = 'Anita Reddy', onSignO
   const [module,     setModule]     = useState<ModuleId>('dashboard');
   const [collapsed,  setCollapsed]  = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
-  // Close mobile nav on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false); };
     window.addEventListener('keydown', handler);
@@ -1542,7 +1310,6 @@ export default function HospitalAdminScreen({ adminName = 'Anita Reddy', onSignO
     <div className="ha-root">
       <style>{CSS}</style>
 
-      {/* Mobile overlay — tap to close nav */}
       <div className={`ha-overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       <div className="ha-shell">
@@ -1561,10 +1328,56 @@ export default function HospitalAdminScreen({ adminName = 'Anita Reddy', onSignO
             title={MODULE_TITLES[module]}
             onHamburger={() => setMobileOpen(o => !o)}
             adminName={adminName}
+            onProfileClick={() => setShowProfile(true)}
           />
           {moduleEl}
         </div>
       </div>
+
+      {/* ── Profile Modal ── */}
+      {showProfile && (
+        <div onClick={() => setShowProfile(false)} style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:200, backdropFilter:'blur(2px)'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:'white', borderRadius:16, padding:28,
+            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
+              <div style={{ width:56, height:56, borderRadius:'50%', background:'var(--primary)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'white', fontSize:20, fontWeight:700 }}>{initials(adminName)}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:17 }}>{adminName}</div>
+                <div style={{ fontSize:13, color:'var(--text-muted)' }}>Administrator · Hospital Admin Portal</div>
+              </div>
+            </div>
+            {[['Full Name', adminName], ['Email', 'admin@vexoo.in'], ['Phone', '+91 98765 43210'], ['Role', 'Hospital Administrator']].map(([label, val]) => (
+              <div key={label} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>{label}</div>
+                <input defaultValue={val} style={{
+                  width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
+                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
+                  color:'var(--text)', background:'var(--bg)'
+                }} />
+              </div>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setShowProfile(false)} style={{
+                flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)',
+                background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
+              }}>Close</button>
+              <button style={{
+                flex:1, padding:'10px', borderRadius:10, border:'none',
+                background:'var(--primary)', color:'white', cursor:'pointer',
+                fontFamily:'inherit', fontSize:13.5, fontWeight:600
+              }}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

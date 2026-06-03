@@ -15,8 +15,10 @@
  *    patientName?  — from AuthContext (e.g. "Sarah Johnson")
  *    onSignOut?    — called when Logout is clicked
  *
- *  Aesthetic: very light #f4f7fb bg, white cards, teal primary (#0d9488),
- *             white sidebar with border, warm rounded corners (18px cards).
+ *  FIXES (May 2026):
+ *  - Header profile avatar now shows hover tooltip with user details + sign out
+ *  - Sidebar has single "Logout" button (no duplicate in header)
+ *  - Profile avatar is the reference design from the screenshot (SJ initials, top-right)
  * ============================================================================
  */
 
@@ -42,6 +44,13 @@ interface LabResult {
   results: [string, string, string, 'normal' | 'high' | 'low'][];
 }
 interface ChatMsg { from: MsgFrom; text: string; time: string; }
+
+// ─── Props ───────────────────────────────────────────────────────────────────
+
+interface PatientScreenProps {
+  patientName?: string;
+  onSignOut?: () => void;
+}
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
@@ -102,8 +111,7 @@ const CSS = `
   flex-shrink: 0;
 }
 .pt-patient-card {
-  margin: 14px 12px;
-  padding: 14px;
+  margin: 14px 12px; padding: 14px;
   background: linear-gradient(135deg, var(--primary), #0891b2);
   border-radius: 14px;
 }
@@ -129,6 +137,8 @@ const CSS = `
   background: var(--rose); color: white;
   font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px;
 }
+
+/* ── Sidebar footer — single logout button ── */
 .pt-sidebar-footer { border-top: 1px solid var(--border); padding: 12px; }
 .pt-logout-btn {
   display: flex; align-items: center; gap: 8px;
@@ -162,12 +172,41 @@ const CSS = `
   cursor: pointer; font-family: inherit; transition: opacity 0.13s;
 }
 .pt-book-btn:hover { opacity: 0.88; }
+
+/* ── Header profile avatar with hover tooltip ── */
+.pt-header-profile { position: relative; cursor: pointer; }
 .pt-header-avatar {
-  width: 34px; height: 34px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #0891b2);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px; cursor: pointer;
+  transition: box-shadow 0.13s;
+}
+.pt-header-avatar:hover { box-shadow: 0 0 0 3px rgba(13,148,136,0.3); }
+.pt-profile-tooltip {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; min-width: 200px; z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.pt-header-profile:hover .pt-profile-tooltip { display: block; }
+.pt-profile-tooltip-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), #0891b2);
   display: flex; align-items: center; justify-content: center;
-  color: white; font-weight: 700; font-size: 13px; flex-shrink: 0;
+  color: white; font-weight: 700; font-size: 15px; margin-bottom: 10px;
 }
+.pt-profile-tooltip-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.pt-profile-tooltip-id   { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.pt-profile-tooltip-divider { height: 1px; background: var(--border); margin: 10px 0; }
+.pt-profile-tooltip-signout {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 7px 10px; border-radius: 8px; border: none; background: transparent;
+  color: var(--rose); font-size: 13px; font-weight: 500; cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.13s;
+}
+.pt-profile-tooltip-signout:hover { background: var(--rl); }
+
 .pt-scroll { flex: 1; overflow-y: auto; }
 
 /* ── Card ── */
@@ -327,12 +366,6 @@ const CSS = `
   justify-content: center; font-weight: 700; color: var(--blue); font-size: 14px;
 }
 .pt-msg-thread { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
-.pt-bubble-wrap { display: flex; gap: 10px; }
-.pt-bubble-dr-avatar {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--bl); display: flex; align-items: center; justify-content: center;
-  font-weight: 700; color: var(--blue); font-size: 12px; flex-shrink: 0;
-}
 .pt-bubble {
   max-width: 60%; padding: 12px 16px;
   font-size: 14px; line-height: 1.6;
@@ -390,7 +423,6 @@ const CSS = `
 }
 @media (max-width: 760px) {
   .pt-header { padding: 0 14px; }
-  .pt-scroll > div { padding: 14px !important; }
   .pt-vitals-grid { grid-template-columns: repeat(2,1fr); }
   .pt-home-bot-grid { grid-template-columns: 1fr; }
   .pt-records-grid  { grid-template-columns: 1fr; }
@@ -473,7 +505,6 @@ const HomeScreen: React.FC<{ onNav: (s: ScreenId) => void; patientName: string }
   const firstName = patientName.split(' ')[0];
   return (
     <div className="pt-scroll pt-fade" style={{ padding:24 }}>
-      {/* Welcome banner */}
       <div className="pt-welcome-banner">
         <div>
           <div style={{ fontSize:22, fontWeight:800, marginBottom:4 }}>Good morning, {firstName} 👋</div>
@@ -482,7 +513,6 @@ const HomeScreen: React.FC<{ onNav: (s: ScreenId) => void; patientName: string }
         <button className="pt-banner-btn" onClick={() => onNav('appts')}>View Appointment</button>
       </div>
 
-      {/* Vitals strip */}
       <div className="pt-vitals-grid">
         {VITALS.map(v => (
           <div key={v.label} className="pt-card">
@@ -498,9 +528,7 @@ const HomeScreen: React.FC<{ onNav: (s: ScreenId) => void; patientName: string }
         ))}
       </div>
 
-      {/* Mid row */}
       <div className="pt-home-mid-grid">
-        {/* Upcoming appointments */}
         <div className="pt-card">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
             <div style={{ fontWeight:700, fontSize:15 }}>Upcoming Appointments</div>
@@ -522,7 +550,6 @@ const HomeScreen: React.FC<{ onNav: (s: ScreenId) => void; patientName: string }
           ))}
         </div>
 
-        {/* My conditions */}
         <div className="pt-card">
           <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>My Conditions</div>
           {([['Hypertension (Stage 1)','Managed','primary'],['Elevated Cholesterol','Monitoring','amber']] as [string,string,ChipColor][]).map(([c, s, col]) => (
@@ -540,9 +567,7 @@ const HomeScreen: React.FC<{ onNav: (s: ScreenId) => void; patientName: string }
         </div>
       </div>
 
-      {/* Bottom row */}
       <div className="pt-home-bot-grid">
-        {/* Recent lab results */}
         <div className="pt-card">
           <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>Recent Lab Results</div>
           {([['CBC Panel','Apr 25, 2026','Normal','primary'],['Metabolic Panel','Apr 20, 2026','Normal','primary'],['Lipid Panel','Mar 15, 2026','Borderline','amber']] as [string,string,string,ChipColor][]).map(([t, d, r, c]) => (
@@ -557,7 +582,6 @@ const HomeScreen: React.FC<{ onNav: (s: ScreenId) => void; patientName: string }
           <button className="pt-view-all-btn" onClick={() => onNav('lab')}>View All Results →</button>
         </div>
 
-        {/* Active medications */}
         <div className="pt-card">
           <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>Active Medications</div>
           {(['Lisinopril 10mg · Once daily · AM','HCTZ 12.5mg · Once daily','Aspirin 81mg · Once daily'] as string[]).map(m => (
@@ -596,8 +620,8 @@ const ApptsScreen: React.FC = () => {
 
       {tab === 'upcoming' && (
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          {[{ date:'May 15', month:'MAY', day:'Thu', doctor:'Dr. Amy Chen',  dept:'Cardiology', type:'Routine Follow-up',    time:'10:00 AM', room:'Room 104', status:'Confirmed' as const },
-            { date:'Jun 3',  month:'JUN', day:'Wed', doctor:'Dr. Raj Patel', dept:'General',    type:'Lab Results Review',   time:'2:30 PM',  room:'Room 201', status:'Pending'   as const }].map((a, i) => (
+          {[{ date:'May 15', month:'MAY', day:'Thu', doctor:'Dr. Amy Chen',  dept:'Cardiology', type:'Routine Follow-up',  time:'10:00 AM', room:'Room 104', status:'Confirmed' as const },
+            { date:'Jun 3',  month:'JUN', day:'Wed', doctor:'Dr. Raj Patel', dept:'General',    type:'Lab Results Review', time:'2:30 PM',  room:'Room 201', status:'Pending' as const }].map((a, i) => (
             <div key={i} className="pt-card pt-appt-card">
               <div className="pt-appt-cal-lg">
                 <div style={{ fontSize:20, fontWeight:800, color:'var(--primary)', lineHeight:1 }}>{a.date.split(' ')[1]}</div>
@@ -643,12 +667,12 @@ const ApptsScreen: React.FC = () => {
         <div className="pt-card pt-book-form">
           <div style={{ fontWeight:700, fontSize:17, marginBottom:18 }}>Book an Appointment</div>
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {([['Department',         ['Cardiology','General Practice','Orthopedics','Pediatrics'],           'select'],
-               ['Preferred Doctor',   ['Dr. Amy Chen','Dr. Raj Patel','Dr. Sarah Kim','Any Available'],      'select'],
-               ['Appointment Type',   ['Routine Follow-up','Consultation','Annual Physical','Urgent'],       'select'],
-               ['Preferred Date',     '',                                                                     'date'],
-               ['Preferred Time',     ['Morning (8-12)','Afternoon (12-5)','Evening (5-8)'],                'select'],
-               ['Reason for Visit',   'Briefly describe your symptoms or reason...',                         'textarea']] as [string, string | string[], string][]).map(([l, v, type]) => (
+            {([['Department',       ['Cardiology','General Practice','Orthopedics','Pediatrics'],         'select'],
+               ['Preferred Doctor', ['Dr. Amy Chen','Dr. Raj Patel','Dr. Sarah Kim','Any Available'],    'select'],
+               ['Appointment Type', ['Routine Follow-up','Consultation','Annual Physical','Urgent'],     'select'],
+               ['Preferred Date',   '',                                                                   'date'],
+               ['Preferred Time',   ['Morning (8-12)','Afternoon (12-5)','Evening (5-8)'],              'select'],
+               ['Reason for Visit', 'Briefly describe your symptoms or reason...',                       'textarea']] as [string, string | string[], string][]).map(([l, v, type]) => (
               <div key={l as string}>
                 <div className="pt-field-label">{l}</div>
                 {type === 'select' ? (
@@ -836,7 +860,7 @@ const MessagesScreen: React.FC = () => {
       <div className="pt-msg-thread" ref={threadRef}>
         {msgs.map((m, i) => (
           <div key={i} style={{ display:'flex', justifyContent: m.from === 'patient' ? 'flex-end' : 'flex-start', gap:10 }}>
-            {m.from === 'doctor' && <div className="pt-bubble-dr-avatar">AC</div>}
+            {m.from === 'doctor' && <div className="pt-msg-dr-avatar" style={{ width:32, height:32, fontSize:12, flexShrink:0 }}>AC</div>}
             <div>
               <div className={`pt-bubble ${m.from}`}>{m.text}</div>
               <div className="pt-bubble-time" style={{ textAlign: m.from === 'patient' ? 'right' : 'left' }}>{m.time}</div>
@@ -953,6 +977,7 @@ const Sidebar: React.FC<{
         })}
       </nav>
 
+      {/* Single logout button in sidebar footer */}
       <div className="pt-sidebar-footer">
         <button className="pt-logout-btn" onClick={onSignOut}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -969,14 +994,10 @@ const Sidebar: React.FC<{
 
 // ─── Root component ───────────────────────────────────────────────────────────
 
-interface PatientScreenProps {
-  patientName?: string;
-  onSignOut?: () => void;
-}
-
 export default function PatientScreen({ patientName = 'Sarah Johnson', onSignOut }: PatientScreenProps) {
   const [screen, setScreen]     = useState<ScreenId>('home');
   const [mobileOpen, setMobile] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobile(false); };
@@ -1006,9 +1027,11 @@ export default function PatientScreen({ patientName = 'Sarah Johnson', onSignOut
 
       {mobileOpen && <div className="pt-overlay open" onClick={() => setMobile(false)} />}
 
-      <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen} patientName={patientName} onSignOut={onSignOut} />
+      <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen}
+        patientName={patientName} onSignOut={onSignOut} />
 
       <div className="pt-main">
+        {/* Header — action button + profile avatar (no duplicate logout) */}
         <div className="pt-header">
           <button className="pt-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
             <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
@@ -1016,11 +1039,87 @@ export default function PatientScreen({ patientName = 'Sarah Johnson', onSignOut
           <div className="pt-header-title">{SCREEN_TITLES[screen]}</div>
           <div className="pt-header-spacer" />
           <button className="pt-book-btn" onClick={() => handleNav('appts')}>+ Book Appointment</button>
-          <div className="pt-header-avatar">{abb}</div>
+
+          {/* Profile avatar — hover to see details + sign out */}
+          <div className="pt-header-profile" onClick={() => setShowProfile(true)}>
+            <div className="pt-header-avatar">{abb}</div>
+            <div className="pt-profile-tooltip">
+              <div className="pt-profile-tooltip-avatar">{abb}</div>
+              <div className="pt-profile-tooltip-name">{patientName}</div>
+              <div className="pt-profile-tooltip-id">Patient ID: P-001</div>
+              <div className="pt-profile-tooltip-divider" />
+              <button
+                className="pt-profile-tooltip-signout"
+                onClick={e => { e.stopPropagation(); setShowProfile(true); }}
+                style={{ color: 'var(--primary)', marginBottom: 4 }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                View / Edit Profile
+              </button>
+              <button className="pt-profile-tooltip-signout" onClick={e => { e.stopPropagation(); onSignOut?.(); }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Sign out
+              </button>
+            </div>
+          </div>
         </div>
 
         {screenEl}
       </div>
+
+      {/* ── Profile Modal ── */}
+      {showProfile && (
+        <div onClick={() => setShowProfile(false)} style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:200, backdropFilter:'blur(2px)'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:'white', borderRadius:18, padding:28,
+            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)',
+            border:'1px solid var(--border)'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
+              <div style={{ width:60, height:60, borderRadius:'50%',
+                background:'linear-gradient(135deg,var(--primary),#0891b2)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:17 }}>{patientName}</div>
+                <div style={{ fontSize:13, color:'var(--muted)' }}>Patient · P-001</div>
+              </div>
+            </div>
+            {[['Full Name', patientName], ['Email', 'sarah.j@email.com'], ['Phone', '+1 555-0101'], ['Date of Birth', 'Mar 15, 1992'], ['Blood Group', 'A+']].map(([label, val]) => (
+              <div key={label} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>{label}</div>
+                <input defaultValue={val} style={{
+                  width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
+                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
+                  color:'var(--text)', background:'var(--bg)'
+                }} />
+              </div>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setShowProfile(false)} style={{
+                flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)',
+                background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
+              }}>Close</button>
+              <button style={{
+                flex:1, padding:'10px', borderRadius:10, border:'none',
+                background:'var(--primary)', color:'white', cursor:'pointer',
+                fontFamily:'inherit', fontSize:13.5, fontWeight:600
+              }}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

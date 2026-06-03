@@ -16,8 +16,10 @@
  *    techName?   — from AuthContext (e.g. "Kevin Liu")
  *    onSignOut?  — called when Logout is clicked
  *
- *  Aesthetic: dark navy sidebar (#1e2a4a), light #f4f6fb body, blue primary
- *             (#3b82f6), STAT alerts in rose, Plus Jakarta Sans.
+ *  FIX (Jun 2026):
+ *  - Header now shows clickable profile avatar (top-right) with hover tooltip
+ *    displaying user details. Click opens an editable profile modal.
+ *  - Single Sign out button only in sidebar. No duplicate logout in header.
  * ============================================================================
  */
 
@@ -25,12 +27,12 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ScreenId   = 'orders' | 'samples' | 'results' | 'review' | 'equipment' | 'reports';
-type Priority   = 'STAT' | 'Urgent' | 'Routine';
-type OrderStatus= 'Processing' | 'Complete' | 'Pending';
+type ScreenId    = 'orders' | 'samples' | 'results' | 'review' | 'equipment' | 'reports';
+type Priority    = 'STAT' | 'Urgent' | 'Routine';
+type OrderStatus = 'Processing' | 'Complete' | 'Pending';
 type SampleStatus = 'Processing' | 'Complete' | 'Awaiting' | 'Scheduled';
-type EqStatus   = 'Online' | 'Warning' | 'Offline';
-type ChipColor  = 'primary' | 'amber' | 'rose' | 'blue' | 'green' | 'purple' | 'gray';
+type EqStatus    = 'Online' | 'Warning' | 'Offline';
+type ChipColor   = 'primary' | 'amber' | 'rose' | 'blue' | 'green' | 'purple' | 'gray';
 
 interface NavItem { id: ScreenId; label: string; path: string; badge?: number; }
 
@@ -138,20 +140,30 @@ const CSS = `
 .lt-nav-btn.inactive:hover { background: rgba(255,255,255,0.07); color: white; }
 .lt-nav-badge { background: var(--rose); color: white; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
 .lt-sidebar-footer { border-top: 1px solid rgba(255,255,255,0.07); padding: 12px; }
-.lt-logout-btn {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 13px; border-radius: 10px; margin-bottom: 6px;
-  background: rgba(255,255,255,0.07); border: none;
-  color: rgba(255,255,255,0.55); font-size: 13px;
-  font-family: inherit; cursor: pointer; width: 100%; transition: background 0.13s;
+.lt-user-identity {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-radius: 10px; margin-bottom: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
 }
-.lt-logout-btn:hover { background: rgba(255,255,255,0.12); color: white; }
-.lt-user-row { display: flex; align-items: center; gap: 10px; padding: 8px 13px; }
 .lt-user-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--purple));
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; color: white; font-size: 12px; flex-shrink: 0;
+}
+.lt-user-name { color: white; font-size: 12.5px; font-weight: 600; }
+.lt-user-role { color: rgba(255,255,255,0.4); font-size: 11px; }
+.lt-logout-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 13px; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.55); font-size: 13px; font-weight: 500;
+  font-family: inherit; cursor: pointer; width: 100%;
+  transition: background 0.13s, color 0.13s, border-color 0.13s;
+}
+.lt-logout-btn:hover {
+  background: rgba(225,29,72,0.12); color: #f87171;
+  border-color: rgba(225,29,72,0.25);
 }
 
 /* mobile overlay */
@@ -177,6 +189,28 @@ const CSS = `
   border-radius: 9px; border: 1px solid #fca5a5;
 }
 .lt-stat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); }
+
+/* ── Profile avatar + tooltip ── */
+.lt-profile-wrap { position: relative; }
+.lt-profile-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px;
+  cursor: pointer; flex-shrink: 0; transition: opacity 0.15s;
+}
+.lt-profile-avatar:hover { opacity: 0.85; }
+.lt-profile-tooltip {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  background: white; border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 200px; z-index: 100; pointer-events: none;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
+}
+.lt-profile-wrap:hover .lt-profile-tooltip { opacity: 1; transform: translateY(0); }
+
 .lt-scroll { flex: 1; overflow-y: auto; }
 
 /* ── Card ── */
@@ -361,12 +395,12 @@ const REVIEW_RESULTS: ReviewResult[] = [
 ];
 
 const EQUIPMENT: Equipment[] = [
-  { id:'ANA-001', name:'Hematology Analyzer',  model:'Sysmex XN-1000',        status:'Online',   load:'72%', lastCalib:'Apr 24, 2026', nextCalib:'May 8, 2026',  tests:['CBC','Reticulocytes'],                uptime:'99.2%' },
-  { id:'ANA-002', name:'Chemistry Analyzer',   model:'Roche Cobas 8000',       status:'Online',   load:'45%', lastCalib:'Apr 22, 2026', nextCalib:'May 6, 2026',  tests:['Metabolic Panel','LFTs','Lipids'],    uptime:'98.8%' },
-  { id:'ANA-003', name:'Immunoassay Analyzer', model:'Abbott Architect',        status:'Warning',  load:'88%', lastCalib:'Apr 20, 2026', nextCalib:'May 4, 2026',  tests:['Troponin','HbA1c','TSH'],            uptime:'96.1%' },
-  { id:'IMG-001', name:'MRI Scanner',          model:'Siemens MAGNETOM',        status:'Online',   load:'30%', lastCalib:'Apr 15, 2026', nextCalib:'May 15, 2026', tests:['MRI Brain','MRI Spine','MRI Body'],  uptime:'99.7%' },
-  { id:'PFT-001', name:'Spirometer',           model:'ndd EasyOne Air',         status:'Online',   load:'20%', lastCalib:'Apr 25, 2026', nextCalib:'May 9, 2026',  tests:['Spirometry','PFT'],                  uptime:'100%'  },
-  { id:'ECG-001', name:'ECG Machine',          model:'Philips PageWriter TC70', status:'Offline',  load:'0%',  lastCalib:'Apr 10, 2026', nextCalib:'—',            tests:['ECG','Holter'],                      uptime:'85.0%' },
+  { id:'ANA-001', name:'Hematology Analyzer',  model:'Sysmex XN-1000',        status:'Online',   load:'72%', lastCalib:'Apr 24, 2026', nextCalib:'May 8, 2026',  tests:['CBC','Reticulocytes'],             uptime:'99.2%' },
+  { id:'ANA-002', name:'Chemistry Analyzer',   model:'Roche Cobas 8000',       status:'Online',   load:'45%', lastCalib:'Apr 22, 2026', nextCalib:'May 6, 2026',  tests:['Metabolic Panel','LFTs','Lipids'],  uptime:'98.8%' },
+  { id:'ANA-003', name:'Immunoassay Analyzer', model:'Abbott Architect',        status:'Warning',  load:'88%', lastCalib:'Apr 20, 2026', nextCalib:'May 4, 2026',  tests:['Troponin','HbA1c','TSH'],           uptime:'96.1%' },
+  { id:'IMG-001', name:'MRI Scanner',          model:'Siemens MAGNETOM',        status:'Online',   load:'30%', lastCalib:'Apr 15, 2026', nextCalib:'May 15, 2026', tests:['MRI Brain','MRI Spine','MRI Body'], uptime:'99.7%' },
+  { id:'PFT-001', name:'Spirometer',           model:'ndd EasyOne Air',         status:'Online',   load:'20%', lastCalib:'Apr 25, 2026', nextCalib:'May 9, 2026',  tests:['Spirometry','PFT'],                 uptime:'100%'  },
+  { id:'ECG-001', name:'ECG Machine',          model:'Philips PageWriter TC70', status:'Offline',  load:'0%',  lastCalib:'Apr 10, 2026', nextCalib:'—',            tests:['ECG','Holter'],                     uptime:'85.0%' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -439,12 +473,8 @@ const OrdersScreen: React.FC = () => {
     return p[a.priority] - p[b.priority];
   }), []);
 
-  const statCount = (key: string, val: string) =>
-    ORDERS.filter(o => (o.priority === val || o.status === val)).length;
-
   return (
     <div className="lt-orders-layout lt-fade">
-      {/* List */}
       <div className="lt-orders-list">
         <div className="lt-orders-stats">
           {([['STAT',   ORDERS.filter(o=>o.priority==='STAT').length,   'var(--rose)',    'var(--rl)'],
@@ -479,7 +509,6 @@ const OrdersScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Detail panel */}
       <div className="lt-orders-detail">
         <div className="lt-detail-header"
           style={{ background: sel.priority === 'STAT' ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e2a4a,#2a3a6a)' }}>
@@ -494,7 +523,6 @@ const OrdersScreen: React.FC = () => {
         </div>
 
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
-          {/* Order details */}
           <div className="lt-detail-section">
             <div className="lt-detail-label">Order Details</div>
             {([['Patient', sel.patient],['Patient ID', sel.pid],['Test', sel.test],
@@ -510,11 +538,10 @@ const OrdersScreen: React.FC = () => {
             ))}
           </div>
 
-          {/* Processing steps */}
           <div>
             <div className="lt-detail-label">Processing Steps</div>
             {PROCESSING_STEPS.map((step, i) => {
-              const done   = sel.status === 'Complete' ? true : sel.status === 'Processing' ? i < 2 ? true : i === 2 ? false : false : i < 1;
+              const done   = sel.status === 'Complete' ? true : sel.status === 'Processing' ? i < 2 : i < 1;
               const active = sel.status === 'Processing' && i === 2;
               return (
                 <div key={step} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
@@ -546,7 +573,7 @@ const OrdersScreen: React.FC = () => {
   );
 };
 
-// ─── Screen: Sample Tracking ──────────────────────────────────────────────────
+// ─── Screen: Samples ─────────────────────────────────────────────────────────
 
 const SamplesScreen: React.FC = () => (
   <div className="lt-scroll lt-fade" style={{ padding:20 }}>
@@ -558,7 +585,7 @@ const SamplesScreen: React.FC = () => (
             <tr>{['Barcode','Patient','Test','Collected','Location','Status','ETA',''].map(h => <th key={h} className="lt-th">{h}</th>)}</tr>
           </thead>
           <tbody>
-            {SAMPLES.map((s, i) => (
+            {SAMPLES.map(s => (
               <tr key={s.barcode} className="lt-tr">
                 <td className="lt-td" style={{ fontWeight:600, color:'var(--primary)', fontSize:12.5, fontFamily:'monospace' }}>{s.barcode}</td>
                 <td className="lt-td" style={{ fontWeight:600 }}>{s.patient}</td>
@@ -579,7 +606,7 @@ const SamplesScreen: React.FC = () => (
   </div>
 );
 
-// ─── Screen: Enter Results ────────────────────────────────────────────────────
+// ─── Screen: Results ──────────────────────────────────────────────────────────
 
 const ResultsScreen: React.FC = () => {
   const activeOrders = ORDERS.filter(o => o.status !== 'Complete');
@@ -589,7 +616,6 @@ const ResultsScreen: React.FC = () => {
   return (
     <div className="lt-scroll lt-fade" style={{ padding:20 }}>
       <div className="lt-results-layout">
-        {/* Order picker */}
         <div>
           <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:4, padding:'0 4px' }}>Active Orders</div>
           {activeOrders.map(o => (
@@ -601,7 +627,6 @@ const ResultsScreen: React.FC = () => {
           ))}
         </div>
 
-        {/* Result form */}
         <div className="lt-card">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
             <div>
@@ -644,7 +669,7 @@ const ResultsScreen: React.FC = () => {
   );
 };
 
-// ─── Screen: Results Review ───────────────────────────────────────────────────
+// ─── Screen: Review ───────────────────────────────────────────────────────────
 
 const ReviewScreen: React.FC = () => (
   <div className="lt-scroll lt-fade" style={{ padding:20, display:'flex', flexDirection:'column', gap:12 }}>
@@ -686,7 +711,7 @@ const ReviewScreen: React.FC = () => (
   </div>
 );
 
-// ─── Screen: Equipment Status ─────────────────────────────────────────────────
+// ─── Screen: Equipment ────────────────────────────────────────────────────────
 
 const EquipmentScreen: React.FC = () => {
   const online  = EQUIPMENT.filter(e => e.status === 'Online').length;
@@ -860,22 +885,23 @@ const Sidebar: React.FC<{
         })}
       </nav>
 
+      {/* Sidebar footer: user identity (read-only) + single sign out button */}
       <div className="lt-sidebar-footer">
+        <div className="lt-user-identity">
+          <div className="lt-user-avatar">{abb}</div>
+          <div>
+            <div className="lt-user-name">{techName}</div>
+            <div className="lt-user-role">Senior Lab Technician</div>
+          </div>
+        </div>
         <button className="lt-logout-btn" onClick={onSignOut}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
-          Logout
+          Sign out
         </button>
-        <div className="lt-user-row">
-          <div className="lt-user-avatar">{abb}</div>
-          <div>
-            <div style={{ color:'white', fontSize:12.5, fontWeight:600 }}>{techName}</div>
-            <div style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Senior Lab Technician</div>
-          </div>
-        </div>
       </div>
     </aside>
   );
@@ -886,9 +912,12 @@ const Sidebar: React.FC<{
 export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: LabTechScreenProps) {
   const [screen, setScreen]     = useState<ScreenId>('orders');
   const [mobileOpen, setMobile] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const abb = initials(techName);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobile(false); };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMobile(false); setShowProfile(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
@@ -918,6 +947,7 @@ export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: Lab
         techName={techName} onSignOut={onSignOut} />
 
       <div className="lt-main">
+        {/* Header — NO logout button here. Single sign-out is in sidebar only. */}
         <div className="lt-header">
           <button className="lt-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
             <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
@@ -929,10 +959,70 @@ export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: Lab
             <span style={{ fontSize:12.5, fontWeight:600, color:'var(--rose)' }}>1 STAT Pending</span>
           </div>
           <div style={{ fontSize:12.5, color:'var(--muted)' }}>{today}</div>
+
+          {/* Clickable profile avatar with hover tooltip */}
+          <div className="lt-profile-wrap">
+            <div className="lt-profile-avatar" onClick={() => setShowProfile(true)}>
+              {abb}
+              <div className="lt-profile-tooltip">
+                <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{techName}</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Senior Lab Technician</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>lab@vexoo.in</div>
+                <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {screenEl}
       </div>
+
+      {/* ── Profile Modal ── */}
+      {showProfile && (
+        <div onClick={() => setShowProfile(false)} style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:200, backdropFilter:'blur(2px)'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:'white', borderRadius:16, padding:28,
+            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)',
+            border:'1px solid var(--border)'
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
+              <div style={{ width:60, height:60, borderRadius:'50%',
+                background:'linear-gradient(135deg,var(--primary),var(--purple))',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:17 }}>{techName}</div>
+                <div style={{ fontSize:13, color:'var(--muted)' }}>Senior Lab Technician · Lab Portal</div>
+              </div>
+            </div>
+            {[['Full Name', techName], ['Email', 'lab@vexoo.in'], ['Phone', '+91 98765 43210'], ['Lab Registration No.', 'LT/2019/TS/00482'], ['Role', 'Senior Lab Technician']].map(([label, val]) => (
+              <div key={label} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>{label}</div>
+                <input defaultValue={val} style={{
+                  width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
+                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
+                  color:'var(--text)', background:'var(--bg)'
+                }} />
+              </div>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setShowProfile(false)} style={{
+                flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)',
+                background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
+              }}>Close</button>
+              <button style={{
+                flex:1, padding:'10px', borderRadius:10, border:'none',
+                background:'var(--primary)', color:'white', cursor:'pointer',
+                fontFamily:'inherit', fontSize:13.5, fontWeight:600
+              }}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
