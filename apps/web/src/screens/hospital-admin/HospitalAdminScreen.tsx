@@ -16,10 +16,14 @@
  *    adminName?  — injected from AuthContext (e.g. "Anita Reddy")
  *    onSignOut?  — called when Sign out is clicked
  *
- *  FIX (May 2026): Sidebar footer now shows a clearly-labelled "Sign out"
- *  button with a logout icon, separate from the user identity row.
- *  Previously the ha-user-inner div was the only sign-out trigger with no
- *  visible label, making it impossible for users to know they could sign out.
+ *  UPDATED (Jun 2026):
+ *  - Header profile card now matches the Patient-screen style:
+ *    avatar circle · name · role · email · divider · View/Edit Profile
+ *    (opens modal) · Sign out (calls onSignOut). Card uses display:none/block
+ *    so the hidden card is fully removed from hit-testing and never blocks
+ *    clicks on the content behind it.
+ *  - Header component now accepts onSignOut so the card's Sign out button
+ *    works without going back to the sidebar.
  * ============================================================================
  */
 
@@ -29,11 +33,45 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
 type ModuleId =
   | 'dashboard' | 'patients' | 'appointments' | 'emr'
-  | 'pharmacy'  | 'lab'      | 'inventory'    | 'analytics' | 'notifications';
+  | 'pharmacy'  | 'lab'      | 'inventory'    | 'analytics' | 'notifications' | 'staff';
 
 type StatusColor = 'primary' | 'amber' | 'rose' | 'blue' | 'purple' | 'green' | 'gray';
 
 interface NavItem { id: ModuleId; label: string; path: string; badge?: number; }
+
+// ─── Staff types ──────────────────────────────────────────────────────────────
+type StaffRole = 'Doctor' | 'Receptionist' | 'Pharmacist' | 'LabTech';
+interface StaffMember {
+  id: string; name: string; role: StaffRole;
+  specialization?: string; department: string;
+  email: string; phone: string; employeeId: string;
+  joinDate: string; status: 'Active' | 'Inactive'; licenceNo?: string;
+}
+
+const STAFF_MEMBERS_INIT: StaffMember[] = [
+  { id:'S-001', name:'Dr. Amy Chen',  role:'Doctor',       specialization:'Cardiologist',    department:'Cardiology',   email:'amy.chen@hospital.vexoo.in',  phone:'+91 98765 43210', employeeId:'EMP-D001', joinDate:'Jan 2024', status:'Active',   licenceNo:'MCI/REG/12483' },
+  { id:'S-002', name:'Dr. Raj Patel', role:'Doctor',       specialization:'Endocrinologist', department:'Endocrinology',email:'raj.patel@hospital.vexoo.in', phone:'+91 98765 43211', employeeId:'EMP-D002', joinDate:'Feb 2024', status:'Active',   licenceNo:'MCI/REG/09214' },
+  { id:'S-003', name:'Maria Lopez',   role:'Receptionist', department:'Reception',           email:'maria.l@hospital.vexoo.in',  phone:'+91 98765 43220', employeeId:'EMP-R001', joinDate:'Jan 2024', status:'Active' },
+  { id:'S-004', name:'Kevin Liu',     role:'LabTech',      department:'Diagnostics',         email:'kevin.l@hospital.vexoo.in',  phone:'+91 98765 43230', employeeId:'EMP-L001', joinDate:'Mar 2024', status:'Active',   licenceNo:'LT/2019/TS/00482' },
+  { id:'S-005', name:'Mei Perez',     role:'Pharmacist',   department:'Pharmacy',            email:'mei.p@hospital.vexoo.in',    phone:'+91 98765 43240', employeeId:'EMP-P001', joinDate:'Apr 2024', status:'Active',   licenceNo:'PH/2020/MH/04182' },
+];
+
+const ROLE_COLORS: Record<StaffRole, [string,string]> = {
+  Doctor:       ['#dbeafe','#3b82f6'],
+  Receptionist: ['#fce7f3','#ec4899'],
+  Pharmacist:   ['#e6faf8','#0d9488'],
+  LabTech:      ['#ede9fe','#7c3aed'],
+};
+const ROLE_LABELS: Record<StaffRole, string> = {
+  Doctor:'Doctor', Receptionist:'Receptionist / Nurse',
+  Pharmacist:'Pharmacist', LabTech:'Lab Technician',
+};
+const DOCTOR_SPECS = [
+  'Cardiologist','General Physician','Endocrinologist','Pulmonologist',
+  'Orthopaedic Surgeon','Neurologist','Paediatrician','Dermatologist',
+  'Ophthalmologist','ENT Specialist','Gynaecologist','Oncologist',
+  'Psychiatrist','Radiologist','Anaesthesiologist',
+];
 
 interface Patient {
   id: string; name: string; age: number; gender: 'M' | 'F';
@@ -165,10 +203,8 @@ const CSS = `
   width: 8px; height: 8px; background: var(--rose); border-radius: 50%;
 }
 
-/* ── Sidebar footer: user identity row + sign out button ── */
-.ha-user-row {
-  border-top: 1px solid rgba(255,255,255,0.07); padding: 12px 10px;
-}
+/* ── Sidebar footer ── */
+.ha-user-row { border-top: 1px solid rgba(255,255,255,0.07); padding: 12px 10px; }
 .ha-user-identity {
   display: flex; align-items: center; gap: 10px; border-radius: 10px;
   padding: 8px 12px; margin-bottom: 8px;
@@ -190,16 +226,11 @@ const CSS = `
   font-size: 13px; font-weight: 500; cursor: pointer;
   transition: background 0.13s, color 0.13s, border-color 0.13s;
 }
-.ha-signout-btn:hover {
-  background: rgba(225,29,72,0.12); color: #f87171;
-  border-color: rgba(225,29,72,0.25);
-}
+.ha-signout-btn:hover { background: rgba(225,29,72,0.12); color: #f87171; border-color: rgba(225,29,72,0.25); }
 .ha-signout-btn svg { flex-shrink: 0; }
 
 /* mobile nav overlay */
-.ha-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9;
-}
+.ha-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9; }
 .ha-overlay.open { display: block; }
 .ha-hamburger {
   display: none; background: none; border: none; cursor: pointer;
@@ -208,9 +239,10 @@ const CSS = `
 
 /* ── Header ── */
 .ha-header {
-  display: flex; align-items: center; padding: 0 24px; height: 62px;
+  display: flex; align-items: center; padding: 0 24px; height: 60px;
   background: var(--card); border-bottom: 1px solid var(--border);
   gap: 14px; flex-shrink: 0;
+  position: relative; z-index: 15;
 }
 .ha-header-title    { font-weight: 700; font-size: 16.5px; }
 .ha-header-date     { font-size: 11.5px; color: var(--text-muted); }
@@ -229,11 +261,6 @@ const CSS = `
   position: relative; transition: background 0.13s;
 }
 .ha-icon-btn:hover { background: var(--border); }
-.ha-notif-dot {
-  position: absolute; top: 7px; right: 7px;
-  width: 7px; height: 7px; background: var(--rose);
-  border-radius: 50%; border: 2px solid white;
-}
 .ha-help-btn {
   background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
   padding: 7px 14px; cursor: pointer; font-size: 13px; color: var(--text-muted);
@@ -241,26 +268,56 @@ const CSS = `
   transition: background 0.13s;
 }
 .ha-help-btn:hover { background: var(--border); }
+
+/* ── Profile wrap (header top-right) ── */
+.ha-profile-wrap { position: relative; }
+
 .ha-header-avatar {
   width: 36px; height: 36px; border-radius: 50%; background: var(--primary);
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 700; font-size: 13px; cursor: pointer;
-  transition: opacity 0.15s;
+  transition: box-shadow 0.15s; user-select: none;
 }
-.ha-header-avatar:hover { opacity: 0.85; }
+.ha-profile-wrap:hover .ha-header-avatar {
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.25);
+}
 
-/* ── Profile avatar tooltip & modal ── */
-.ha-profile-wrap { position: relative; }
+/* ── Profile hover card — Patient-screen style ── */
+
 .ha-profile-tooltip {
-  position: absolute; top: calc(100% + 10px); right: 0;
-  background: white; border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  min-width: 200px; z-index: 100; pointer-events: none;
-  opacity: 0; transform: translateY(-4px);
-  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
+  display: none; position: absolute; top: calc(100% + 10px); right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; min-width: 230px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+  z-index: 1000;
+  /* z-index overridden to 1000 by globals.css */
 }
-.ha-profile-wrap:hover .ha-profile-tooltip { opacity: 1; transform: translateY(0); }
+  
+.ha-profile-wrap:hover .ha-profile-tooltip { display: block; }
+.ha-profile-tooltip::before {
+  content: ''; position: absolute;
+  top: -12px; left: 0; right: 0; height: 12px;
+}
+
+.ha-tt-avatar {
+  width: 46px; height: 46px; border-radius: 50%; background: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 16px; margin-bottom: 12px;
+}
+.ha-tt-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.ha-tt-sub  { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.ha-tt-divider { height: 1px; background: var(--border); margin: 12px 0; }
+.ha-tt-action {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 10px; border-radius: 9px; border: none; background: transparent;
+  font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.13s;
+}
+.ha-tt-action svg { flex-shrink: 0; }
+.ha-tt-action.profile { color: var(--primary); }
+.ha-tt-action.profile:hover { background: var(--primary-light); }
+.ha-tt-action.signout { color: var(--rose); }
+.ha-tt-action.signout:hover { background: var(--rose-light); }
 
 /* ── Shared UI ── */
 .ha-card {
@@ -419,12 +476,12 @@ const PRESCRIPTIONS: Prescription[] = [
 ];
 
 const LAB_ORDERS: LabOrder[] = [
-  { id:'L-0091', patient:'Marcus Williams', test:'HbA1c Panel',          ordered:'Dr. Patel', date:'Apr 26', status:'In Progress', priority:'Routine', result:'' },
-  { id:'L-0092', patient:"James O'Brien",   test:'ECG + Troponin',       ordered:'Dr. Chen',  date:'Apr 26', status:'Critical',    priority:'STAT',    result:'Troponin elevated' },
-  { id:'L-0093', patient:'Sarah Johnson',   test:'CBC + Metabolic Panel',ordered:'Dr. Chen',  date:'Apr 25', status:'Complete',    priority:'Routine', result:'Within normal range' },
-  { id:'L-0094', patient:'Elena Rodriguez', test:'Spirometry',           ordered:'Dr. Kim',   date:'Apr 25', status:'Complete',    priority:'Routine', result:'FEV1 68% — mild obstruction' },
-  { id:'L-0095', patient:'Priya Sharma',    test:'MRI Brain',            ordered:'Dr. Patel', date:'Apr 24', status:'Pending',     priority:'Urgent',  result:'' },
-  { id:'L-0096', patient:'Thomas Klein',    test:'Pulmonary Function Test',ordered:'Dr. Kim', date:'Apr 23', status:'Complete',    priority:'Routine', result:'Moderate COPD confirmed' },
+  { id:'L-0091', patient:'Marcus Williams', test:'HbA1c Panel',           ordered:'Dr. Patel', date:'Apr 26', status:'In Progress', priority:'Routine', result:'' },
+  { id:'L-0092', patient:"James O'Brien",   test:'ECG + Troponin',        ordered:'Dr. Chen',  date:'Apr 26', status:'Critical',    priority:'STAT',    result:'Troponin elevated' },
+  { id:'L-0093', patient:'Sarah Johnson',   test:'CBC + Metabolic Panel', ordered:'Dr. Chen',  date:'Apr 25', status:'Complete',    priority:'Routine', result:'Within normal range' },
+  { id:'L-0094', patient:'Elena Rodriguez', test:'Spirometry',            ordered:'Dr. Kim',   date:'Apr 25', status:'Complete',    priority:'Routine', result:'FEV1 68% — mild obstruction' },
+  { id:'L-0095', patient:'Priya Sharma',    test:'MRI Brain',             ordered:'Dr. Patel', date:'Apr 24', status:'Pending',     priority:'Urgent',  result:'' },
+  { id:'L-0096', patient:'Thomas Klein',    test:'Pulmonary Function Test',ordered:'Dr. Kim',  date:'Apr 23', status:'Complete',    priority:'Routine', result:'Moderate COPD confirmed' },
 ];
 
 const INVENTORY: InventoryItem[] = [
@@ -446,7 +503,7 @@ const NOTIFICATIONS_DATA: Notification[] = [
   { id:5, type:'info',     title:'New Patient Registration',              body:'Thomas Klein has been registered and assigned to Dr. Kim.',                  time:'2 hrs ago',  read:false },
   { id:6, type:'success',  title:'Prescription Dispensed',                body:"RX-4823 — Amiodarone 200mg dispensed to James O'Brien.",                    time:'3 hrs ago',  read:true  },
   { id:7, type:'info',     title:'Lab Results Ready',                     body:'CBC + Metabolic Panel for Sarah Johnson are ready for review.',              time:'4 hrs ago',  read:true  },
-  { id:8, type:'success',  title:'Payment Processed',                     body:'Invoice #INV-2408 — $1,240 received from Marcus Williams.',                  time:'5 hrs ago',  read:true  },
+  { id:8, type:'success',  title:'Payment Processed',                     body:'Invoice #INV-2408 — ₹1,240 received from Marcus Williams.',                  time:'5 hrs ago',  read:true  },
 ];
 
 const APPOINTMENTS: Appointment[] = [
@@ -471,12 +528,14 @@ const NAV: NavItem[] = [
   { id:'inventory',     label:'Inventory',        path:'M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.53 15.58 1 13.5 3.08L12 4.58l-1.5-1.51C8.42 1 6 2.53 6 4.64c0 .48.11.92.18 1.36H4c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z' },
   { id:'analytics',     label:'Analytics',        path:'M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z' },
   { id:'notifications', label:'Notifications',    path:'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z', badge: 5 },
+  { id:'staff', label:'Staff Management', path:'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z' },
 ];
 
 const MODULE_TITLES: Record<ModuleId, string> = {
   dashboard:'Dashboard', patients:'Patients', appointments:'Appointments',
   emr:'Medical Records', pharmacy:'Pharmacy', lab:'Lab & Diagnostics',
   inventory:'Inventory', analytics:'Analytics', notifications:'Notifications',
+  staff:'Staff Management',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -658,11 +717,12 @@ const Dashboard: React.FC<{ setModule: (m: ModuleId) => void }> = ({ setModule }
 );
 
 // ─── Module: Patients ─────────────────────────────────────────────────────────
-
 const PatientsModule: React.FC = () => {
   const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
   const [selected, setSelected] = useState<Patient | null>(null);
-
+  const inpStyle: React.CSSProperties = { width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit', background:'var(--bg)', boxSizing:'border-box' };
+  
   const filtered = useMemo(() =>
     PATIENTS.filter(p =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -722,15 +782,13 @@ const PatientsModule: React.FC = () => {
             </div>
             <div className="ha-card">
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Active Medications</div>
-              {([['Lisinopril 10mg', 'Once daily, morning', 'Ongoing'],
-                 ['Hydrochlorothiazide 12.5mg', 'Once daily', 'Ongoing'],
-                 ['Aspirin 81mg', 'Once daily', 'Ongoing']] as [string, string, string][]).map(([name, schedule, status]) => (
-                <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg)', borderRadius: 10, marginBottom: 8 }}>
+              {(['Lisinopril 10mg · Once daily, morning', 'Hydrochlorothiazide 12.5mg · Once daily', 'Aspirin 81mg · Once daily'] as string[]).map(m => (
+                <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg)', borderRadius: 10, marginBottom: 8 }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{schedule}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{m.split(' · ')[0]}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{m.split(' · ')[1]}</div>
                   </div>
-                  <Badge label={status} color="primary" />
+                  <Badge label="Ongoing" color="primary" />
                 </div>
               ))}
             </div>
@@ -747,7 +805,7 @@ const PatientsModule: React.FC = () => {
           <div className="ha-section-title">Patients</div>
           <div className="ha-section-sub">{PATIENTS.length} registered patients</div>
         </div>
-        <button className="ha-action-btn">
+        <button className="ha-action-btn" onClick={() => setShowAdd(true)}>
           <SvgIcon path="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" size={14} color="white" />
           New Patient
         </button>
@@ -785,17 +843,59 @@ const PatientsModule: React.FC = () => {
           </table>
         </div>
       </div>
+      {showAdd && (
+        <>
+          <div onClick={() => setShowAdd(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:100 }} />
+          <div style={{ position:'fixed', right:0, top:0, bottom:0, width:440, background:'white', boxShadow:'-8px 0 40px rgba(0,0,0,0.14)', zIndex:101, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+            <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+              <div style={{ fontWeight:800, fontSize:17 }}>Register New Patient</div>
+              <button onClick={() => setShowAdd(false)} style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', cursor:'pointer', fontSize:12.5, fontFamily:'inherit' }}>✕ Close</button>
+            </div>
+            <div style={{ padding:24, flex:1, display:'flex', flexDirection:'column', gap:14 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>First Name *</div><input style={inpStyle} placeholder="First name" /></div>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Last Name *</div><input style={inpStyle} placeholder="Last name" /></div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Date of Birth *</div><input style={inpStyle} type="date" /></div>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Gender</div><select style={{...inpStyle, cursor:'pointer'}}><option>Male</option><option>Female</option><option>Other</option></select></div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Phone *</div><input style={inpStyle} placeholder="+91 XXXXX XXXXX" /></div>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Blood Group</div><select style={{...inpStyle, cursor:'pointer'}}>{['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(b => <option key={b}>{b}</option>)}</select></div>
+              </div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Email</div><input style={inpStyle} type="email" placeholder="patient@email.com" /></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Address</div><input style={inpStyle} placeholder="Street, City, State" /></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Emergency Contact Name</div><input style={inpStyle} placeholder="Guardian / Next of kin" /></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Emergency Contact Phone</div><input style={inpStyle} placeholder="+91 XXXXX XXXXX" /></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Known Allergies</div><input style={inpStyle} placeholder="e.g. Penicillin, Sulfonamides" /></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Assign Doctor</div><select style={{...inpStyle, cursor:'pointer'}}><option>— Select Doctor —</option><option>Dr. Amy Chen · Cardiologist</option><option>Dr. Raj Patel · Endocrinologist</option></select></div>
+            </div>
+            <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexShrink:0 }}>
+              <button className="ha-action-btn" style={{ flex:1, justifyContent:'center' }} onClick={() => setShowAdd(false)}>Register Patient</button>
+              <button onClick={() => setShowAdd(false)} style={{ padding:'10px 18px', borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Cancel</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
 
-// ─── Module: Appointments ─────────────────────────────────────────────────────
+// ─── Module: Appointments
 
 const AppointmentsModule: React.FC = () => {
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const dates = [20, 21, 22, 23, 24, 25, 26];
+  const days   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dates  = [20, 21, 22, 23, 24, 25, 26];
   const counts = [5, 8, 6, 9, 7, 4, 34];
   const [activeDay, setActiveDay] = useState(6);
+  const [showFlyout, setShowFlyout] = useState(false);
+
+  const inpStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', border: '1px solid var(--border)',
+    borderRadius: 9, fontSize: 13.5, outline: 'none', fontFamily: 'inherit',
+    background: 'var(--bg)', color: 'var(--text)', boxSizing: 'border-box',
+  };
 
   return (
     <div className="ha-content ha-fade">
@@ -804,11 +904,12 @@ const AppointmentsModule: React.FC = () => {
           <div className="ha-section-title">Appointments</div>
           <div className="ha-section-sub">April 26, 2026</div>
         </div>
-        <button className="ha-action-btn">
+        <button className="ha-action-btn" onClick={() => setShowFlyout(true)}>
           <SvgIcon path="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" size={14} color="white" />
           New Appointment
         </button>
       </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }} className="ha-grid-2-1">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ha-card" style={{ padding: '16px 20px' }}>
@@ -842,11 +943,14 @@ const AppointmentsModule: React.FC = () => {
             ))}
           </div>
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="ha-card">
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Today's Summary</div>
-            {([['Total', '34', 'var(--primary-light)', 'var(--primary)'], ['Confirmed', '18', 'var(--blue-light)', 'var(--blue)'],
-               ['In Progress', '6', 'var(--amber-light)', 'var(--amber)'], ['Pending', '8', 'var(--purple-light)', 'var(--purple)'],
+            {([['Total', '34', 'var(--primary-light)', 'var(--primary)'],
+               ['Confirmed', '18', 'var(--blue-light)', 'var(--blue)'],
+               ['In Progress', '6', 'var(--amber-light)', 'var(--amber)'],
+               ['Pending', '8', 'var(--purple-light)', 'var(--purple)'],
                ['Completed', '2', 'var(--green-light)', 'var(--green)']] as [string, string, string, string][]).map(([l, v, bg, c]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: bg, borderRadius: 10, marginBottom: 8 }}>
                 <span style={{ fontSize: 13, color: c, fontWeight: 500 }}>{l}</span>
@@ -856,11 +960,141 @@ const AppointmentsModule: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── New Appointment Flyout ── */}
+      {showFlyout && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowFlyout(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 100 }}
+          />
+
+          {/* Flyout panel */}
+          <div style={{
+            position: 'fixed', right: 0, top: 0, bottom: 0, width: 460,
+            background: 'white', boxShadow: '-8px 0 40px rgba(0,0,0,0.14)',
+            zIndex: 101, overflowY: 'auto', display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Header */}
+            <div style={{ padding: '22px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>New Appointment</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Fill in the details to schedule</div>
+              </div>
+              <button
+                onClick={() => setShowFlyout(false)}
+                style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 13px', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', color: 'var(--text-muted)' }}>
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Form body */}
+            <div style={{ padding: 24, flex: 1, display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+              {/* Patient Name */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Patient Name *</div>
+                <input style={inpStyle} placeholder="Search or enter patient name..." />
+              </div>
+
+              {/* Date & Time */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Date *</div>
+                  <input style={inpStyle} type="date" defaultValue="2026-04-26" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Time *</div>
+                  <input style={inpStyle} type="time" defaultValue="09:00" />
+                </div>
+              </div>
+
+              {/* Doctor */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Doctor *</div>
+                <select style={{ ...inpStyle, cursor: 'pointer' }}>
+                  <option value="">— Select Doctor —</option>
+                  <option>Dr. Amy Chen · Cardiologist</option>
+                  <option>Dr. Raj Patel · Endocrinologist</option>
+                  <option>Dr. Yeon Kim · General Physician</option>
+                  <option>Dr. Arjun Mehta · Neurologist</option>
+                  <option>Dr. Priya Sundar · Paediatrician</option>
+                  <option>Dr. Suman Rao · Orthopaedic Surgeon</option>
+                </select>
+              </div>
+
+              {/* Visit Type & Room */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Visit Type</div>
+                  <select style={{ ...inpStyle, cursor: 'pointer' }}>
+                    <option>Consultation</option>
+                    <option>Follow-Up</option>
+                    <option>Check-Up</option>
+                    <option>Procedure</option>
+                    <option>Lab Review</option>
+                    <option>Emergency</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Room</div>
+                  <select style={{ ...inpStyle, cursor: 'pointer' }}>
+                    <option>Room 101</option>
+                    <option>Room 102</option>
+                    <option>Room 103</option>
+                    <option>Room 104</option>
+                    <option>Room 201</option>
+                    <option>Room 202</option>
+                    <option>Room 302</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Duration */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Duration</div>
+                <select style={{ ...inpStyle, cursor: 'pointer' }}>
+                  <option>15 minutes</option>
+                  <option>20 minutes</option>
+                  <option>30 minutes</option>
+                  <option>45 minutes</option>
+                  <option>60 minutes</option>
+                </select>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Notes (optional)</div>
+                <textarea
+                  style={{ ...inpStyle, resize: 'vertical', minHeight: 80 }}
+                  placeholder="Any special instructions or reason for visit..."
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0 }}>
+              <button
+                className="ha-action-btn"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => setShowFlyout(false)}>
+                <SvgIcon path="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" size={15} color="white" />
+                Schedule Appointment
+              </button>
+              <button
+                onClick={() => setShowFlyout(false)}
+                style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--text-muted)' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
-
-// ─── Module: EMR (simplified) ─────────────────────────────────────────────────
+// ─── Module: EMR ──────────────────────────────────────────────────────────────
 
 const EMRModule: React.FC = () => {
   const p = PATIENTS[0];
@@ -921,14 +1155,17 @@ const EMRModule: React.FC = () => {
 
 // ─── Module: Pharmacy ─────────────────────────────────────────────────────────
 
-const PharmacyModule: React.FC = () => (
+const PharmacyModule: React.FC = () => {
+  const [showRx, setShowRx] = useState(false);
+  const inpStyle: React.CSSProperties = { width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit', background:'var(--bg)', boxSizing:'border-box' };
+  return (
   <div className="ha-content ha-fade">
     <div className="ha-section-head">
       <div>
         <div className="ha-section-title">Pharmacy</div>
         <div className="ha-section-sub">{PRESCRIPTIONS.length} prescriptions today</div>
       </div>
-      <button className="ha-action-btn">
+      <button className="ha-action-btn" onClick={() => setShowRx(true)}>
         <SvgIcon path="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" size={14} color="white" />
         New Prescription
       </button>
@@ -958,10 +1195,40 @@ const PharmacyModule: React.FC = () => (
         </table>
       </div>
     </div>
-  </div>
-);
+{showRx && (
+        <>
+          <div onClick={() => setShowRx(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:100 }} />
+          <div style={{ position:'fixed', right:0, top:0, bottom:0, width:440, background:'white', boxShadow:'-8px 0 40px rgba(0,0,0,0.14)', zIndex:101, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+            <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+              <div style={{ fontWeight:800, fontSize:17 }}>Add Prescription</div>
+              <button onClick={() => setShowRx(false)} style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', cursor:'pointer', fontSize:12.5, fontFamily:'inherit' }}>✕ Close</button>
+            </div>
+            <div style={{ padding:24, flex:1, display:'flex', flexDirection:'column', gap:14 }}>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Patient *</div><select style={{...inpStyle,cursor:'pointer'}}><option>— Select Patient —</option><option>Sarah Johnson · P-001</option><option>Marcus Williams · P-002</option></select></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Prescribing Doctor *</div><select style={{...inpStyle,cursor:'pointer'}}><option>— Select Doctor —</option><option>Dr. Amy Chen</option><option>Dr. Raj Patel</option></select></div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Drug Name *</div><input style={inpStyle} placeholder="e.g. Lisinopril 10mg" /></div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Dosage</div><input style={inpStyle} placeholder="e.g. 10mg" /></div>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Quantity</div><input style={inpStyle} type="number" placeholder="30" /></div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Frequency</div><select style={{...inpStyle,cursor:'pointer'}}><option>Once daily</option><option>Twice daily</option><option>Three times daily</option><option>As needed</option></select></div>
+                <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Duration</div><input style={inpStyle} placeholder="e.g. 30 days" /></div>
+              </div>
+              <div><div style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5 }}>Instructions</div><textarea style={{...inpStyle,resize:'vertical',minHeight:70}} placeholder="Take with food. Monitor BP weekly..." /></div>
+            </div>
+            <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexShrink:0 }}>
+              <button className="ha-action-btn" style={{ flex:1, justifyContent:'center' }} onClick={() => setShowRx(false)}>Submit Prescription</button>
+              <button onClick={() => setShowRx(false)} style={{ padding:'10px 18px', borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Cancel</button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
-// ─── Module: Lab ──────────────────────────────────────────────────────────────
+// ─── Module: Lab──────────────────────────────────────────────────────────────
 
 const LabModule: React.FC = () => (
   <div className="ha-content ha-fade">
@@ -1006,64 +1273,445 @@ const LabModule: React.FC = () => (
 
 // ─── Module: Inventory ────────────────────────────────────────────────────────
 
-const InventoryModule: React.FC = () => (
-  <div className="ha-content ha-fade">
-    <div className="ha-section-head">
-      <div>
-        <div className="ha-section-title">Inventory</div>
-        <div className="ha-section-sub">{INVENTORY.length} items tracked</div>
+// ─── Drug inventory data (pulled from Pharmacy) ───────────────────────────────
+
+const INV_DRUGS = [
+  { id:'S-001', name:'Lisinopril 10mg',    category:'Cardiovascular', qty:1240, min:200,  max:2000, unit:'tabs',  expiry:'Dec 2026' },
+  { id:'S-002', name:'Metformin 500mg',    category:'Diabetes',       qty:180,  min:200,  max:1500, unit:'tabs',  expiry:'Nov 2026' },
+  { id:'S-003', name:'Amiodarone 200mg',   category:'Cardiac',        qty:95,   min:100,  max:500,  unit:'tabs',  expiry:'Sep 2026' },
+  { id:'S-004', name:'Salbutamol Inhaler', category:'Respiratory',    qty:48,   min:20,   max:150,  unit:'units', expiry:'Mar 2027' },
+  { id:'S-005', name:'Sumatriptan 50mg',   category:'Neurology',      qty:320,  min:100,  max:800,  unit:'tabs',  expiry:'Feb 2027' },
+  { id:'S-006', name:'Paracetamol 500mg',  category:'Analgesics',     qty:2800, min:500,  max:5000, unit:'tabs',  expiry:'Aug 2027' },
+  { id:'S-007', name:'Omeprazole 20mg',    category:'GI',             qty:640,  min:150,  max:1200, unit:'caps',  expiry:'Jul 2027' },
+  { id:'S-008', name:'Atorvastatin 40mg',  category:'Cardiovascular', qty:880,  min:200,  max:1500, unit:'tabs',  expiry:'May 2027' },
+];
+
+const INV_EQUIPMENT = [
+  { id:'ANA-001', name:'Hematology Analyzer',  model:'Sysmex XN-1000',        eqStatus:'Online',  load:'72%', lastCalib:'Apr 24, 2026', nextCalib:'May 8, 2026',  tests:['CBC','Reticulocytes'],             uptime:'99.2%' },
+  { id:'ANA-002', name:'Chemistry Analyzer',   model:'Roche Cobas 8000',       eqStatus:'Online',  load:'45%', lastCalib:'Apr 22, 2026', nextCalib:'May 6, 2026',  tests:['Metabolic Panel','LFTs','Lipids'],  uptime:'98.8%' },
+  { id:'ANA-003', name:'Immunoassay Analyzer', model:'Abbott Architect',        eqStatus:'Warning', load:'88%', lastCalib:'Apr 20, 2026', nextCalib:'May 4, 2026',  tests:['Troponin','HbA1c','TSH'],           uptime:'96.1%' },
+  { id:'IMG-001', name:'MRI Scanner',          model:'Siemens MAGNETOM',        eqStatus:'Online',  load:'30%', lastCalib:'Apr 15, 2026', nextCalib:'May 15, 2026', tests:['MRI Brain','MRI Spine','MRI Body'], uptime:'99.7%' },
+  { id:'PFT-001', name:'Spirometer',           model:'ndd EasyOne Air',         eqStatus:'Online',  load:'20%', lastCalib:'Apr 25, 2026', nextCalib:'May 9, 2026',  tests:['Spirometry','PFT'],                 uptime:'100%'  },
+  { id:'ECG-001', name:'ECG Machine',          model:'Philips PageWriter TC70', eqStatus:'Offline', load:'0%',  lastCalib:'Apr 10, 2026', nextCalib:'—',            tests:['ECG','Holter'],                     uptime:'85.0%' },
+];
+
+function invDrugStatus(qty: number, min: number): 'Critical' | 'Low' | 'OK' {
+  if (qty < min * 0.5) return 'Critical';
+  if (qty < min)       return 'Low';
+  return 'OK';
+}
+function eqBorderCol(s: string) {
+  if (s === 'Online')  return 'var(--primary)';
+  if (s === 'Warning') return 'var(--amber)';
+  return 'var(--rose)';
+}
+
+const InventoryModule: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'drugs' | 'equipment'>('drugs');
+
+  // ── Drug state ──────────────────────────────────────────────────────────────
+  const [drugs, setDrugs] = useState(INV_DRUGS);
+  const [openDrugMenu, setOpenDrugMenu]       = useState<string | null>(null);
+  const [showAddDrug, setShowAddDrug]         = useState(false);
+  const [editingDrug, setEditingDrug]         = useState<typeof INV_DRUGS[0] | null>(null);
+  const [confirmDeleteDrug, setConfirmDeleteDrug] = useState<string | null>(null);
+  const [drugForm, setDrugForm] = useState({
+    name:'', category:'Cardiovascular', qty:'', min:'', max:'', unit:'tabs', expiry:'',
+  });
+
+  // ── Equipment state ─────────────────────────────────────────────────────────
+  const [equipment, setEquipment] = useState(INV_EQUIPMENT);
+  const [openEqMenu, setOpenEqMenu]           = useState<string | null>(null);
+  const [showAddEq, setShowAddEq]             = useState(false);
+  const [editingEq, setEditingEq]             = useState<typeof INV_EQUIPMENT[0] | null>(null);
+  const [confirmDeleteEq, setConfirmDeleteEq] = useState<string | null>(null);
+  const [eqForm, setEqForm] = useState({
+    name:'', model:'', eqStatus:'Online', load:'0%', lastCalib:'', nextCalib:'', uptime:'100%', tests:'',
+  });
+
+  // ── KPI counts ──────────────────────────────────────────────────────────────
+  const drugOK       = drugs.filter(d => invDrugStatus(d.qty, d.min) === 'OK').length;
+  const drugLow      = drugs.filter(d => invDrugStatus(d.qty, d.min) === 'Low').length;
+  const drugCritical = drugs.filter(d => invDrugStatus(d.qty, d.min) === 'Critical').length;
+  const eqOnline     = equipment.filter(e => e.eqStatus === 'Online').length;
+  const eqWarning    = equipment.filter(e => e.eqStatus === 'Warning').length;
+  const eqOffline    = equipment.filter(e => e.eqStatus === 'Offline').length;
+
+  // ── Drug handlers ────────────────────────────────────────────────────────────
+  const openEditDrug = (d: typeof INV_DRUGS[0]) => {
+    setEditingDrug(d);
+    setDrugForm({ name:d.name, category:d.category, qty:String(d.qty), min:String(d.min), max:String(d.max), unit:d.unit, expiry:d.expiry });
+    setOpenDrugMenu(null);
+  };
+  const saveDrug = () => {
+    if (editingDrug) {
+      setDrugs(prev => prev.map(d => d.id === editingDrug.id
+        ? { ...d, name:drugForm.name, category:drugForm.category, qty:Number(drugForm.qty), min:Number(drugForm.min), max:Number(drugForm.max), unit:drugForm.unit, expiry:drugForm.expiry }
+        : d));
+      setEditingDrug(null);
+    } else {
+      const newId = 'S-' + String(drugs.length + 1).padStart(3,'0');
+      setDrugs(prev => [...prev, { id:newId, name:drugForm.name, category:drugForm.category, qty:Number(drugForm.qty), min:Number(drugForm.min), max:Number(drugForm.max), unit:drugForm.unit, expiry:drugForm.expiry }]);
+      setShowAddDrug(false);
+    }
+    setDrugForm({ name:'', category:'Cardiovascular', qty:'', min:'', max:'', unit:'tabs', expiry:'' });
+  };
+  const deleteDrug = (id: string) => { setDrugs(prev => prev.filter(d => d.id !== id)); setConfirmDeleteDrug(null); };
+
+  // ── Equipment handlers ───────────────────────────────────────────────────────
+  const openEditEq = (e: typeof INV_EQUIPMENT[0]) => {
+    setEditingEq(e);
+    setEqForm({ name:e.name, model:e.model, eqStatus:e.eqStatus, load:e.load, lastCalib:e.lastCalib, nextCalib:e.nextCalib, uptime:e.uptime, tests:e.tests.join(', ') });
+    setOpenEqMenu(null);
+  };
+  const saveEq = () => {
+    if (editingEq) {
+      setEquipment(prev => prev.map(e => e.id === editingEq.id
+        ? { ...e, name:eqForm.name, model:eqForm.model, eqStatus:eqForm.eqStatus, load:eqForm.load, lastCalib:eqForm.lastCalib, nextCalib:eqForm.nextCalib, uptime:eqForm.uptime, tests:eqForm.tests.split(',').map(t => t.trim()).filter(Boolean) }
+        : e));
+      setEditingEq(null);
+    } else {
+      const newId = 'EQ-' + String(equipment.length + 1).padStart(3,'0');
+      setEquipment(prev => [...prev, { id:newId, name:eqForm.name, model:eqForm.model, eqStatus:eqForm.eqStatus, load:eqForm.load, lastCalib:eqForm.lastCalib, nextCalib:eqForm.nextCalib, uptime:eqForm.uptime, tests:eqForm.tests.split(',').map(t => t.trim()).filter(Boolean) }]);
+      setShowAddEq(false);
+    }
+    setEqForm({ name:'', model:'', eqStatus:'Online', load:'0%', lastCalib:'', nextCalib:'', uptime:'100%', tests:'' });
+  };
+  const deleteEq = (id: string) => { setEquipment(prev => prev.filter(e => e.id !== id)); setConfirmDeleteEq(null); };
+
+  // ── Shared styles ────────────────────────────────────────────────────────────
+  const inpStyle: React.CSSProperties = {
+    width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:9,
+    fontSize:13.5, outline:'none', fontFamily:'inherit', background:'var(--bg)', color:'var(--text)', boxSizing:'border-box',
+  };
+  const labelStyle: React.CSSProperties = { fontSize:12, fontWeight:600, color:'var(--text-muted)', marginBottom:5, display:'block' };
+
+  // ── Drug drawer (Add / Edit) ─────────────────────────────────────────────────
+  const DrugDrawer = () => {
+    const isEdit = !!editingDrug;
+    const close = () => { setShowAddDrug(false); setEditingDrug(null); };
+    return (
+      <>
+        <div onClick={close} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:100 }} />
+        <div style={{ position:'fixed', right:0, top:0, bottom:0, width:440, background:'white', boxShadow:'-8px 0 40px rgba(0,0,0,0.14)', zIndex:101, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+          <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:17 }}>{isEdit ? 'Edit Drug' : 'Add New Drug'}</div>
+              <div style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:2 }}>{isEdit ? `Editing: ${editingDrug!.name}` : 'Add a new drug to inventory'}</div>
+            </div>
+            <button onClick={close} style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', cursor:'pointer', fontSize:12.5, fontFamily:'inherit' }}>✕ Close</button>
+          </div>
+          <div style={{ padding:24, flex:1, display:'flex', flexDirection:'column', gap:14 }}>
+            <div><label style={labelStyle}>Drug Name *</label><input style={inpStyle} value={drugForm.name} onChange={e => setDrugForm(f => ({...f, name:e.target.value}))} placeholder="e.g. Lisinopril 10mg" /></div>
+            <div>
+              <label style={labelStyle}>Category *</label>
+              <select style={{...inpStyle, cursor:'pointer'}} value={drugForm.category} onChange={e => setDrugForm(f => ({...f, category:e.target.value}))}>
+                {['Cardiovascular','Diabetes','Cardiac','Respiratory','Neurology','Analgesics','GI','Antibiotics','Oncology','Other'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+              <div><label style={labelStyle}>Current Stock *</label><input style={inpStyle} type="number" value={drugForm.qty} onChange={e => setDrugForm(f => ({...f, qty:e.target.value}))} placeholder="e.g. 500" /></div>
+              <div><label style={labelStyle}>Min Required</label><input style={inpStyle} type="number" value={drugForm.min} onChange={e => setDrugForm(f => ({...f, min:e.target.value}))} placeholder="e.g. 100" /></div>
+              <div><label style={labelStyle}>Max Capacity</label><input style={inpStyle} type="number" value={drugForm.max} onChange={e => setDrugForm(f => ({...f, max:e.target.value}))} placeholder="e.g. 2000" /></div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div>
+                <label style={labelStyle}>Unit</label>
+                <select style={{...inpStyle, cursor:'pointer'}} value={drugForm.unit} onChange={e => setDrugForm(f => ({...f, unit:e.target.value}))}>
+                  {['tabs','caps','units','vials','sachets','bottles','boxes','bags'].map(u => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+              <div><label style={labelStyle}>Expiry Date</label><input style={inpStyle} value={drugForm.expiry} onChange={e => setDrugForm(f => ({...f, expiry:e.target.value}))} placeholder="e.g. Dec 2026" /></div>
+            </div>
+          </div>
+          <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexShrink:0 }}>
+            <button className="ha-action-btn" style={{ flex:1, justifyContent:'center' }} onClick={saveDrug}>
+              {isEdit ? '✓ Save Changes' : '+ Add Drug'}
+            </button>
+            <button onClick={close} style={{ padding:'10px 18px', borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Cancel</button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // ── Equipment drawer (Add / Edit) ────────────────────────────────────────────
+  const EqDrawer = () => {
+    const isEdit = !!editingEq;
+    const close = () => { setShowAddEq(false); setEditingEq(null); };
+    return (
+      <>
+        <div onClick={close} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:100 }} />
+        <div style={{ position:'fixed', right:0, top:0, bottom:0, width:440, background:'white', boxShadow:'-8px 0 40px rgba(0,0,0,0.14)', zIndex:101, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+          <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:17 }}>{isEdit ? 'Edit Equipment' : 'Add New Equipment'}</div>
+              <div style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:2 }}>{isEdit ? `Editing: ${editingEq!.name}` : 'Register new lab equipment'}</div>
+            </div>
+            <button onClick={close} style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', cursor:'pointer', fontSize:12.5, fontFamily:'inherit' }}>✕ Close</button>
+          </div>
+          <div style={{ padding:24, flex:1, display:'flex', flexDirection:'column', gap:14 }}>
+            <div><label style={labelStyle}>Equipment Name *</label><input style={inpStyle} value={eqForm.name} onChange={e => setEqForm(f => ({...f, name:e.target.value}))} placeholder="e.g. Hematology Analyzer" /></div>
+            <div><label style={labelStyle}>Model / Manufacturer *</label><input style={inpStyle} value={eqForm.model} onChange={e => setEqForm(f => ({...f, model:e.target.value}))} placeholder="e.g. Sysmex XN-1000" /></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div>
+                <label style={labelStyle}>Status</label>
+                <select style={{...inpStyle, cursor:'pointer'}} value={eqForm.eqStatus} onChange={e => setEqForm(f => ({...f, eqStatus:e.target.value}))}>
+                  <option>Online</option><option>Warning</option><option>Offline</option>
+                </select>
+              </div>
+              <div><label style={labelStyle}>Current Load</label><input style={inpStyle} value={eqForm.load} onChange={e => setEqForm(f => ({...f, load:e.target.value}))} placeholder="e.g. 72%" /></div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div><label style={labelStyle}>Last Calibrated</label><input style={inpStyle} value={eqForm.lastCalib} onChange={e => setEqForm(f => ({...f, lastCalib:e.target.value}))} placeholder="e.g. Apr 24, 2026" /></div>
+              <div><label style={labelStyle}>Next Calibration Due</label><input style={inpStyle} value={eqForm.nextCalib} onChange={e => setEqForm(f => ({...f, nextCalib:e.target.value}))} placeholder="e.g. May 8, 2026" /></div>
+            </div>
+            <div><label style={labelStyle}>Uptime</label><input style={inpStyle} value={eqForm.uptime} onChange={e => setEqForm(f => ({...f, uptime:e.target.value}))} placeholder="e.g. 99.2%" /></div>
+            <div><label style={labelStyle}>Test Capabilities (comma-separated)</label><input style={inpStyle} value={eqForm.tests} onChange={e => setEqForm(f => ({...f, tests:e.target.value}))} placeholder="e.g. CBC, Reticulocytes, WBC" /></div>
+          </div>
+          <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexShrink:0 }}>
+            <button className="ha-action-btn" style={{ flex:1, justifyContent:'center' }} onClick={saveEq}>
+              {isEdit ? '✓ Save Changes' : '+ Add Equipment'}
+            </button>
+            <button onClick={close} style={{ padding:'10px 18px', borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Cancel</button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // ── Delete confirmation modal ─────────────────────────────────────────────────
+  const DeleteModal = ({ label, onConfirm, onCancel }: { label:string; onConfirm:()=>void; onCancel:()=>void }) => (
+    <>
+      <div onClick={onCancel} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200 }} />
+      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'white', borderRadius:16, padding:28, width:380, maxWidth:'90vw', zIndex:201, boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ textAlign:'center', marginBottom:18 }}>
+          <div style={{ width:50, height:50, borderRadius:'50%', background:'var(--rose-light)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px', fontSize:22 }}>🗑</div>
+          <div style={{ fontWeight:800, fontSize:17, marginBottom:6 }}>Delete Item?</div>
+          <div style={{ fontSize:13.5, color:'var(--text-muted)', lineHeight:1.6 }}>Are you sure you want to delete <strong>{label}</strong>? This cannot be undone.</div>
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onCancel} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Cancel</button>
+          <button onClick={onConfirm} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'var(--rose)', color:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5, fontWeight:700 }}>Yes, Delete</button>
+        </div>
       </div>
-      <button className="ha-action-btn">
-        <SvgIcon path="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" size={14} color="white" />
-        Add Item
-      </button>
-    </div>
-    <div className="ha-card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="ha-table-wrap">
-        <table className="ha-table">
-          <thead><tr>{['Item', 'Category', 'Current Stock', 'Min Required', 'Unit', 'Expiry', 'Status', ''].map(h => <Th key={h}>{h}</Th>)}</tr></thead>
-          <tbody>
-            {INVENTORY.map((item, i) => {
-              const barColor = item.status === 'Critical' ? 'var(--rose)' : item.status === 'Low' ? 'var(--amber)' : 'var(--primary)';
-              const pct = Math.min(100, (item.stock / Math.max(item.min * 3, item.stock)) * 100);
+    </>
+  );
+
+  // ── Close menus when clicking outside ────────────────────────────────────────
+  const closeMenus = () => { setOpenDrugMenu(null); setOpenEqMenu(null); };
+
+  return (
+    <div className="ha-content ha-fade" onClick={closeMenus}>
+
+      {/* ── Section header with tab switcher + Add button ── */}
+      <div className="ha-section-head">
+        <div>
+          <div className="ha-section-title">Inventory</div>
+          <div className="ha-section-sub">Drug stock · Lab equipment status</div>
+        </div>
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          {/* Tab switcher */}
+          <button onClick={() => setActiveTab('drugs')} style={{ padding:'7px 18px', borderRadius:9, border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, background: activeTab==='drugs'?'var(--primary)':'var(--card)', color: activeTab==='drugs'?'white':'var(--text-muted)', boxShadow: activeTab==='drugs'?'none':'0 0 0 1px var(--border)' }}>
+            Drug Inventory
+          </button>
+          <button onClick={() => setActiveTab('equipment')} style={{ padding:'7px 18px', borderRadius:9, border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, background: activeTab==='equipment'?'var(--primary)':'var(--card)', color: activeTab==='equipment'?'white':'var(--text-muted)', boxShadow: activeTab==='equipment'?'none':'0 0 0 1px var(--border)' }}>
+            Equipment Status
+          </button>
+          {/* Context-aware Add button */}
+          <button className="ha-action-btn" onClick={e => { e.stopPropagation(); activeTab==='drugs' ? setShowAddDrug(true) : setShowAddEq(true); }}>
+            <SvgIcon path="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" size={14} color="white" />
+            {activeTab === 'drugs' ? 'Add Drug' : 'Add Equipment'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Drug Inventory Tab ── */}
+      {activeTab === 'drugs' && (
+        <>
+          {/* KPI strip */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+            {([
+              ['Total Items', String(drugs.length), 'var(--primary)', 'var(--primary-light)'],
+              ['OK',          String(drugOK),        'var(--green)',   'var(--green-light)'],
+              ['Low Stock',   String(drugLow),       'var(--amber)',   'var(--amber-light)'],
+              ['Critical',    String(drugCritical),  'var(--rose)',    'var(--rose-light)'],
+            ] as [string,string,string,string][]).map(([l,v,c,bg]) => (
+              <div key={l} className="ha-card" style={{ background:bg, border:'none', textAlign:'center', padding:'14px 16px' }}>
+                <div style={{ fontSize:26, fontWeight:800, color:c }}>{v}</div>
+                <div style={{ fontSize:12, color:c, marginTop:3, fontWeight:500 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Drug table */}
+          <div className="ha-card" style={{ padding:0, overflow:'hidden' }}>
+            <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', fontWeight:700, fontSize:15 }}>Drug Inventory</div>
+            <div className="ha-table-wrap">
+              <table className="ha-table">
+                <thead>
+                  <tr>{['Drug Name','Category','Stock','Min','Max','Stock Level','Expiry','Status','Actions'].map(h => <Th key={h}>{h}</Th>)}</tr>
+                </thead>
+                <tbody>
+                  {drugs.map((d, i) => {
+                    const st = invDrugStatus(d.qty, d.min);
+                    const pct = Math.min(100, (d.qty / d.max) * 100);
+                    const barColor = st==='Critical'?'var(--rose)':st==='Low'?'var(--amber)':'var(--primary)';
+                    const menuOpen = openDrugMenu === d.id;
+                    return (
+                      <tr key={d.id} className="ha-tr" style={{ borderBottom: i < drugs.length-1?'1px solid var(--border)':'none', background: st==='Critical'?'#fff8f8':undefined }}>
+                        <Td><span style={{ fontWeight:700 }}>{d.name}</span></Td>
+                        <Td><Badge label={d.category} color="gray" /></Td>
+                        <Td><span style={{ fontWeight:700, color: st==='Critical'?'var(--rose)':st==='Low'?'var(--amber)':'var(--text)' }}>{d.qty.toLocaleString()}</span></Td>
+                        <Td style={{ color:'var(--text-muted)' }}>{d.min}</Td>
+                        <Td style={{ color:'var(--text-muted)' }}>{d.max}</Td>
+                        <Td style={{ minWidth:120 }}>
+                          <div style={{ background:'#f1f5f9', borderRadius:4, height:7, overflow:'hidden' }}>
+                            <div style={{ width:`${pct}%`, height:'100%', background:barColor, borderRadius:4 }} />
+                          </div>
+                        </Td>
+                        <Td style={{ color:'var(--text-muted)' }}>{d.expiry}</Td>
+                        <Td><Badge label={st} color={st==='Critical'?'rose':st==='Low'?'amber':'primary'} /></Td>
+                        <Td>
+                          {/* Ellipsis menu */}
+                          <div style={{ position:'relative' }}>
+                            <button
+                              onClick={e => { e.stopPropagation(); setOpenDrugMenu(menuOpen ? null : d.id); }}
+                              style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'4px 10px', fontSize:16, cursor:'pointer', fontFamily:'inherit', color:'var(--text-muted)', lineHeight:1 }}>
+                              ⋯
+                            </button>
+                            {menuOpen && (
+                              <div onClick={e => e.stopPropagation()} style={{ position:'absolute', right:0, top:'calc(100% + 4px)', background:'white', border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', zIndex:50, minWidth:130, overflow:'hidden' }}>
+                                <button onClick={() => openEditDrug(d)} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:500, color:'var(--text)' }}>
+                                  ✏️ Edit
+                                </button>
+                                <div style={{ height:1, background:'var(--border)' }} />
+                                <button onClick={() => { setConfirmDeleteDrug(d.id); setOpenDrugMenu(null); }} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:500, color:'var(--rose)' }}>
+                                  🗑 Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Equipment Status Tab ── */}
+      {activeTab === 'equipment' && (
+        <>
+          {/* KPI strip */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+            {([
+              ['Online',  eqOnline,          'var(--green)', 'var(--green-light)'],
+              ['Warning', eqWarning,         'var(--amber)', 'var(--amber-light)'],
+              ['Offline', eqOffline,         'var(--rose)',  'var(--rose-light)'],
+              ['Total',   equipment.length,  'var(--primary)','var(--primary-light)'],
+            ] as [string,number,string,string][]).map(([l,n,c,bg]) => (
+              <div key={l} className="ha-card" style={{ background:bg, border:'none', textAlign:'center', padding:'14px 16px' }}>
+                <div style={{ fontSize:26, fontWeight:800, color:c }}>{n}</div>
+                <div style={{ fontSize:12, color:c, marginTop:3, fontWeight:500 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Equipment cards grid */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:14 }}>
+            {equipment.map(e => {
+              const menuOpen = openEqMenu === e.id;
               return (
-                <tr key={item.id} className="ha-tr" style={{ borderBottom: i < INVENTORY.length - 1 ? '1px solid var(--border)' : 'none', background: item.status === 'Critical' ? '#fff8f8' : undefined }}>
-                  <Td><span style={{ fontWeight: 600 }}>{item.name}</span></Td>
-                  <Td><Badge label={item.category} color="gray" /></Td>
-                  <Td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 4, height: 6, overflow: 'hidden', minWidth: 60 }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 4 }} />
-                      </div>
-                      <span style={{ fontWeight: 600, fontSize: 13 }}>{item.stock.toLocaleString()}</span>
+                <div key={e.id} className="ha-card" style={{ borderLeft:`4px solid ${eqBorderCol(e.eqStatus)}`, padding:'18px 20px', display:'flex', flexDirection:'column', gap:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{e.name}</div>
+                      <div style={{ fontSize:12.5, color:'var(--text-muted)' }}>{e.model} · {e.id}</div>
                     </div>
-                  </Td>
-                  <Td style={{ color: 'var(--text-muted)' }}>{item.min}</Td>
-                  <Td style={{ color: 'var(--text-muted)' }}>{item.unit}</Td>
-                  <Td style={{ color: 'var(--text-muted)' }}>{item.expiry}</Td>
-                  <Td><Badge label={item.status} color={statusColor(item.status)} /></Td>
-                  <Td>
-                    <button style={{ background: item.status !== 'OK' ? 'var(--primary)' : 'transparent', color: item.status !== 'OK' ? 'white' : 'var(--text-muted)', border: item.status !== 'OK' ? 'none' : '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
-                      {item.status !== 'OK' ? 'Reorder' : 'Manage'}
-                    </button>
-                  </Td>
-                </tr>
+                    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                      <Badge label={e.eqStatus} color={e.eqStatus==='Online'?'primary':e.eqStatus==='Warning'?'amber':'rose'} />
+                      {/* Ellipsis menu */}
+                      <div style={{ position:'relative' }}>
+                        <button
+                          onClick={ev => { ev.stopPropagation(); setOpenEqMenu(menuOpen ? null : e.id); }}
+                          style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'4px 10px', fontSize:16, cursor:'pointer', fontFamily:'inherit', color:'var(--text-muted)', lineHeight:1 }}>
+                          ⋯
+                        </button>
+                        {menuOpen && (
+                          <div onClick={ev => ev.stopPropagation()} style={{ position:'absolute', right:0, top:'calc(100% + 4px)', background:'white', border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', zIndex:50, minWidth:130, overflow:'hidden' }}>
+                            <button onClick={() => openEditEq(e)} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:500, color:'var(--text)' }}>
+                              ✏️ Edit
+                            </button>
+                            <div style={{ height:1, background:'var(--border)' }} />
+                            <button onClick={() => { setConfirmDeleteEq(e.id); setOpenEqMenu(null); }} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 14px', background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:500, color:'var(--rose)' }}>
+                              🗑 Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Meta grid */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {([['Current Load',e.load],['Uptime',e.uptime],['Last Calibrated',e.lastCalib],['Next Due',e.nextCalib]] as [string,string][]).map(([k,v]) => (
+                      <div key={k} style={{ background:'var(--bg)', borderRadius:8, padding:'8px 10px' }}>
+                        <div style={{ fontSize:10.5, color:'var(--text-muted)', marginBottom:2 }}>{k}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color: k==='Current Load'&&parseInt(e.load)>80?'var(--amber)':'var(--text)' }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Test tags */}
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {e.tests.map(t => (
+                      <span key={t} style={{ fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:20, background:'#f1f5f9', color:'var(--text-muted)' }}>{t}</span>
+                    ))}
+                  </div>
+
+                  {/* Warning banner */}
+                  {e.eqStatus !== 'Online' && (
+                    <div style={{ padding:'8px 12px', borderRadius:9, fontSize:12.5, fontWeight:600, background: e.eqStatus==='Warning'?'var(--amber-light)':'var(--rose-light)', color: e.eqStatus==='Warning'?'var(--amber)':'var(--rose)' }}>
+                      {e.eqStatus==='Warning' ? '⚠ High load — schedule maintenance' : '🔴 Offline — contact biomedical engineering'}
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
+          </div>
+        </>
+      )}
 
+      {/* ── Drawers and modals ── */}
+      {(showAddDrug || editingDrug) && <DrugDrawer />}
+      {(showAddEq   || editingEq)   && <EqDrawer />}
+      {confirmDeleteDrug && (
+        <DeleteModal
+          label={drugs.find(d => d.id === confirmDeleteDrug)?.name ?? ''}
+          onConfirm={() => deleteDrug(confirmDeleteDrug)}
+          onCancel={() => setConfirmDeleteDrug(null)}
+        />
+      )}
+      {confirmDeleteEq && (
+        <DeleteModal
+          label={equipment.find(e => e.id === confirmDeleteEq)?.name ?? ''}
+          onConfirm={() => deleteEq(confirmDeleteEq)}
+          onCancel={() => setConfirmDeleteEq(null)}
+        />
+      )}
+    </div>
+  );
+};
 // ─── Module: Analytics ────────────────────────────────────────────────────────
 
 const AnalyticsModule: React.FC = () => {
   const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'];
   const revenue = [42000, 47000, 51000, 38000, 54000, 59000, 62000];
   const maxRev = Math.max(...revenue);
-
   return (
     <div className="ha-content ha-fade">
       <div className="ha-section-head">
@@ -1104,16 +1752,12 @@ const AnalyticsModule: React.FC = () => {
 
 const NotificationsModule: React.FC = () => {
   const [notifs, setNotifs] = useState<Notification[]>(NOTIFICATIONS_DATA);
-
   const markRead = useCallback((id: number) =>
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n)), []);
-
   const markAllRead = useCallback(() =>
     setNotifs(prev => prev.map(n => ({ ...n, read: true }))), []);
-
   const typeIcon = (t: string) =>
     t === 'critical' ? '🔴' : t === 'alert' ? '🟡' : t === 'success' ? '🟢' : '🔵';
-
   const notifBg = (t: string) =>
     t === 'critical' ? 'var(--rose-light)' : t === 'alert' ? 'var(--amber-light)' : t === 'success' ? 'var(--green-light)' : 'var(--blue-light)';
 
@@ -1156,10 +1800,264 @@ const NotificationsModule: React.FC = () => {
   );
 };
 
+// ─── Staff Management Screen ──────────────────────────────────────────────────
+type StaffTabId = 'all' | 'doctor' | 'reception' | 'pharmacy' | 'labtech';
+
+const StaffScreen: React.FC<{ hospitalName?: string }> = ({ hospitalName = 'Hospital' }) => {
+  const [tab, setTab]                         = useState<StaffTabId>('all');
+  const [staffList, setStaffList]             = useState<StaffMember[]>(STAFF_MEMBERS_INIT);
+  const [showDrawer, setShowDrawer]           = useState(false);
+  const [credentials, setCredentials]         = useState<(StaffMember & { tempPass: string }) | null>(null);
+  const [form, setForm] = useState({
+    name:'', role:'Doctor' as StaffRole, specialization:'Cardiologist',
+    email:'', phone:'', licenceNo:'',
+  });
+
+  const counts = {
+    all: staffList.length,
+    doctor: staffList.filter(s => s.role === 'Doctor').length,
+    reception: staffList.filter(s => s.role === 'Receptionist').length,
+    pharmacy: staffList.filter(s => s.role === 'Pharmacist').length,
+    labtech: staffList.filter(s => s.role === 'LabTech').length,
+  };
+
+  const filtered = tab === 'all' ? staffList
+    : tab === 'doctor'    ? staffList.filter(s => s.role === 'Doctor')
+    : tab === 'reception' ? staffList.filter(s => s.role === 'Receptionist')
+    : tab === 'pharmacy'  ? staffList.filter(s => s.role === 'Pharmacist')
+    : staffList.filter(s => s.role === 'LabTech');
+
+  const nextId = (role: StaffRole) => {
+    const prefix = { Doctor:'D', Receptionist:'R', Pharmacist:'P', LabTech:'L' }[role];
+    const n = String(staffList.filter(s => s.role === role).length + 1).padStart(3,'0');
+    return `EMP-${prefix}${n}`;
+  };
+  const tempPass = () => 'Vex@' + Math.random().toString(36).slice(2,6).toUpperCase();
+
+  const handleCreate = () => {
+    if (!form.name.trim() || !form.email.trim()) return;
+    const dept = form.role === 'Doctor' ? form.specialization
+               : form.role === 'Receptionist' ? 'Reception'
+               : form.role === 'Pharmacist'   ? 'Pharmacy' : 'Diagnostics';
+    const member: StaffMember = {
+      id: `S-${Date.now()}`, name: form.name, role: form.role,
+      specialization: form.role === 'Doctor' ? form.specialization : undefined,
+      department: dept, email: form.email, phone: form.phone,
+      employeeId: nextId(form.role),
+      joinDate: new Date().toLocaleDateString('en-IN',{month:'short',year:'numeric'}),
+      status: 'Active', licenceNo: form.licenceNo || undefined,
+    };
+    const pass = tempPass();
+    setStaffList(s => [...s, member]);
+    setShowDrawer(false);
+    setCredentials({ ...member, tempPass: pass });
+    setForm({ name:'', role:'Doctor', specialization:'Cardiologist', email:'', phone:'', licenceNo:'' });
+  };
+
+  const inpStyle: React.CSSProperties = {
+    width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
+    borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
+    background:'var(--bg)', color:'var(--text)', boxSizing:'border-box',
+  };
+  const labelStyle: React.CSSProperties = { fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5, display:'block' };
+
+  return (
+    <div className="ha-scroll ha-fade" style={{ padding:20 }}>
+
+      {/* ── KPI strip ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:12, marginBottom:20 }}>
+        {([['Total Staff',counts.all,'var(--text)'],['Doctors',counts.doctor,'#3b82f6'],
+           ['Reception',counts.reception,'#ec4899'],['Pharmacy',counts.pharmacy,'#0d9488'],
+           ['Lab Tech',counts.labtech,'#7c3aed']] as [string,number,string][]).map(([l,v,c]) => (
+          <div key={l} className="ha-card">
+            <div style={{ fontSize:10.5, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:4 }}>{l}</div>
+            <div style={{ fontSize:26, fontWeight:800, color:c }}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Toolbar ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          {([['all','All Staff'],['doctor','Doctors'],['reception','Reception'],
+             ['pharmacy','Pharmacy'],['labtech','Lab Tech']] as [StaffTabId,string][]).map(([id,label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{
+              padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
+              fontSize:12.5, fontWeight: tab===id ? 700 : 500, border: tab===id ? 'none' : '1px solid var(--border)',
+              background: tab===id ? 'var(--primary)' : 'var(--card)', color: tab===id ? 'white' : 'var(--muted)',
+            }}>
+              {label} ({counts[id]})
+            </button>
+          ))}
+        </div>
+        <button className="ha-new-btn" onClick={() => setShowDrawer(true)}>+ Create Staff Profile</button>
+      </div>
+
+      {/* ── Staff cards ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+        {filtered.map(s => {
+          const [bg, color] = ROLE_COLORS[s.role];
+          const abb = s.name.split(' ').map(n => n[0]).join('').slice(0,2);
+          return (
+            <div key={s.id} className="ha-card" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:'50%', background:bg, color, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:15, flexShrink:0 }}>{abb}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontWeight:700, fontSize:14, marginBottom:2 }}>{s.name}</div>
+                  <div style={{ fontSize:12, color:'var(--muted)' }}>{s.specialization ?? ROLE_LABELS[s.role]}</div>
+                </div>
+                <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20, background:bg, color, flexShrink:0 }}>
+                  {s.role === 'LabTech' ? 'Lab Tech' : s.role}
+                </span>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {([['Employee ID',s.employeeId],['Status',s.status],['Email',s.email],['Phone',s.phone||'—']] as [string,string][]).map(([k,v]) => (
+                  <div key={k} style={{ background:'var(--bg)', borderRadius:8, padding:'7px 10px' }}>
+                    <div style={{ fontSize:10.5, color:'var(--muted)', marginBottom:2 }}>{k}</div>
+                    <div style={{ fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color: k==='Status'?(v==='Active'?'#16a34a':'#e11d48'):'var(--text)' }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              {s.licenceNo && (
+                <div style={{ background: ROLE_COLORS[s.role][0], borderRadius:8, padding:'7px 10px' }}>
+                  <div style={{ fontSize:10.5, color: ROLE_COLORS[s.role][1], fontWeight:600, marginBottom:2 }}>Licence / Reg. No.</div>
+                  <div style={{ fontSize:12, fontWeight:700, color: ROLE_COLORS[s.role][1], fontFamily:'monospace' }}>{s.licenceNo}</div>
+                </div>
+              )}
+              <div style={{ display:'flex', gap:8 }}>
+                <button style={{ flex:1, padding:'7px', borderRadius:9, border:'1px solid var(--border)', background:'transparent', fontSize:12.5, cursor:'pointer', fontFamily:'inherit', color:'var(--muted)' }}>Edit</button>
+                <button style={{ flex:1, padding:'7px', borderRadius:9, border:'none', background: ROLE_COLORS[s.role][0], fontSize:12.5, cursor:'pointer', fontFamily:'inherit', color: ROLE_COLORS[s.role][1], fontWeight:600 }}>Details</button>
+                <button style={{ flex:1, padding:'7px', borderRadius:9, border:'none', background:'var(--rose-light)', fontSize:12.5, cursor:'pointer', fontFamily:'inherit', color:'var(--rose)', fontWeight:600 }}>Reset PW</button>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div style={{ gridColumn:'1/-1', textAlign:'center', padding:'48px 20px', color:'var(--muted)' }}>
+            <div style={{ fontSize:40, marginBottom:10 }}>👤</div>
+            <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>No profiles created yet</div>
+            <div style={{ fontSize:13, marginBottom:16 }}>Create the first staff profile for this role.</div>
+            <button className="ha-new-btn" onClick={() => setShowDrawer(true)}>+ Create Staff Profile</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Create Profile Drawer ── */}
+      {showDrawer && (
+        <>
+          <div onClick={() => setShowDrawer(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:100 }} />
+          <div style={{ position:'fixed', right:0, top:0, bottom:0, width:440, background:'white', boxShadow:'-8px 0 40px rgba(0,0,0,0.14)', zIndex:101, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+            <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+              <div>
+                <div style={{ fontWeight:800, fontSize:17 }}>Create Staff Profile</div>
+                <div style={{ fontSize:12.5, color:'var(--muted)', marginTop:2 }}>{hospitalName}</div>
+              </div>
+              <button onClick={() => setShowDrawer(false)} style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', cursor:'pointer', fontSize:12.5, fontFamily:'inherit' }}>✕ Close</button>
+            </div>
+
+            <div style={{ padding:24, flex:1 }}>
+              {/* Role picker */}
+              <div style={{ marginBottom:18 }}>
+                <label style={labelStyle}>STAFF ROLE *</label>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {(['Doctor','Receptionist','Pharmacist','LabTech'] as StaffRole[]).map(role => {
+                    const [bg, color] = ROLE_COLORS[role];
+                    const sel = form.role === role;
+                    return (
+                      <button key={role} onClick={() => setForm(f => ({...f, role}))}
+                        style={{ padding:'10px 12px', borderRadius:10, border:`2px solid ${sel?color:'var(--border)'}`, background: sel?bg:'transparent', cursor:'pointer', fontFamily:'inherit', fontWeight: sel?700:400, color: sel?color:'var(--muted)', fontSize:13, textAlign:'left' }}>
+                        {ROLE_LABELS[role]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ marginBottom:14 }}>
+                <label style={labelStyle}>Full Name *</label>
+                <input style={inpStyle} value={form.name} onChange={e => setForm(f => ({...f,name:e.target.value}))} placeholder="e.g. Dr. Arjun Mehta" />
+              </div>
+
+              {form.role === 'Doctor' && (
+                <div style={{ marginBottom:14 }}>
+                  <label style={labelStyle}>Specialization *</label>
+                  <select style={{...inpStyle, cursor:'pointer'}} value={form.specialization} onChange={e => setForm(f => ({...f,specialization:e.target.value}))}>
+                    {DOCTOR_SPECS.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+                <div>
+                  <label style={labelStyle}>Work Email *</label>
+                  <input style={inpStyle} type="email" value={form.email} onChange={e => setForm(f => ({...f,email:e.target.value}))} placeholder="name@vexoo.in" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Phone</label>
+                  <input style={inpStyle} value={form.phone} onChange={e => setForm(f => ({...f,phone:e.target.value}))} placeholder="+91 XXXXX XXXXX" />
+                </div>
+              </div>
+
+              {form.role !== 'Receptionist' && (
+                <div style={{ marginBottom:14 }}>
+                  <label style={labelStyle}>
+                    {form.role==='Doctor'?'MCI Registration No.':form.role==='Pharmacist'?'Pharmacy Licence No.':'Lab Technician Licence No.'}
+                  </label>
+                  <input style={inpStyle} value={form.licenceNo} onChange={e => setForm(f => ({...f,licenceNo:e.target.value}))} placeholder={form.role==='Doctor'?'MCI/REG/XXXXX':'e.g. PH/2024/TS/XXXXX'} />
+                </div>
+              )}
+
+              <div style={{ background:'#fffef5', border:'1px solid #fde68a', borderRadius:12, padding:14 }}>
+                <div style={{ fontSize:11.5, fontWeight:700, color:'#92400e', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:8 }}>Auto-Generated on Creation</div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                  <span style={{ fontSize:12.5, color:'#78350f' }}>Employee ID</span>
+                  <span style={{ fontSize:12.5, fontWeight:700, fontFamily:'monospace', color:'#92400e' }}>{nextId(form.role)}</span>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:12.5, color:'#78350f' }}>Temp Password</span>
+                  <span style={{ fontSize:12.5, fontWeight:700, fontFamily:'monospace', color:'#92400e' }}>Vex@••••••</span>
+                </div>
+                <div style={{ fontSize:11.5, color:'#92400e', marginTop:8, lineHeight:1.5 }}>Share these with the staff member. Password must be changed on first login.</div>
+              </div>
+            </div>
+
+            <div style={{ padding:'16px 24px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexShrink:0 }}>
+              <button onClick={handleCreate} className="ha-new-btn" style={{ flex:1, justifyContent:'center' }}>Create Profile & Generate Credentials</button>
+              <button onClick={() => setShowDrawer(false)} style={{ padding:'10px 18px', borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Cancel</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Credentials reveal modal ── */}
+      {credentials && (
+        <div onClick={() => setCredentials(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, backdropFilter:'blur(2px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'white', borderRadius:16, padding:28, width:400, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ textAlign:'center', marginBottom:18 }}>
+              <div style={{ width:56, height:56, borderRadius:'50%', background:'#dcfce7', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', fontSize:26 }}>✓</div>
+              <div style={{ fontWeight:800, fontSize:18 }}>Profile Created!</div>
+              <div style={{ fontSize:13, color:'var(--muted)', marginTop:4 }}>Share these login credentials with {credentials.name}.</div>
+            </div>
+            {([['Name',credentials.name],['Role',ROLE_LABELS[credentials.role]],['Employee ID',credentials.employeeId],['Login Email',credentials.email]] as [string,string][]).map(([k,v]) => (
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'9px 12px', background:'var(--bg)', borderRadius:9, marginBottom:8 }}>
+                <span style={{ fontSize:13, color:'var(--muted)' }}>{k}</span>
+                <span style={{ fontSize:13, fontWeight:700, fontFamily: k==='Employee ID'?'monospace':'inherit' }}>{v}</span>
+              </div>
+            ))}
+            <div style={{ background:'#fffef5', border:'1px solid #fde68a', borderRadius:12, padding:14, marginBottom:18, textAlign:'center' }}>
+              <div style={{ fontSize:12, color:'#92400e', fontWeight:600, marginBottom:6 }}>🔑 Temporary Password — Show Once</div>
+              <div style={{ fontSize:24, fontWeight:800, fontFamily:'monospace', color:'#92400e', letterSpacing:3 }}>{credentials.tempPass}</div>
+              <div style={{ fontSize:11.5, color:'#92400e', marginTop:6 }}>Must be changed on first login</div>
+            </div>
+            <button onClick={() => setCredentials(null)} className="ha-new-btn" style={{ width:'100%', justifyContent:'center' }}>Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-// FIX: The footer is now split into two elements:
-//   1. ha-user-identity  — read-only display of name + avatar (not clickable)
-//   2. ha-signout-btn    — clearly labelled "Sign out" button with logout icon
 
 const Sidebar: React.FC<{
   active:    ModuleId;
@@ -1171,7 +2069,6 @@ const Sidebar: React.FC<{
   onSignOut?: () => void;
 }> = ({ active, onNav, collapsed, onToggle, mobileOpen, adminName, onSignOut }) => {
   const abb = initials(adminName);
-
   return (
     <nav className={`ha-sidebar ${collapsed ? 'collapsed' : 'expanded'} ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="ha-logo-row">
@@ -1185,9 +2082,7 @@ const Sidebar: React.FC<{
           <SvgIcon path={collapsed ? 'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z' : 'M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z'} size={14} color="white" />
         </button>
       </div>
-
       {!collapsed && <div className="ha-nav-section-label">Main Menu</div>}
-
       <div className="ha-nav">
         {NAV.map(item => (
           <button key={item.id} className={`ha-nav-btn ${active === item.id ? 'active' : ''}`}
@@ -1199,10 +2094,7 @@ const Sidebar: React.FC<{
           </button>
         ))}
       </div>
-
-      {/* Sidebar footer: user identity (read-only) + sign out button */}
       <div className="ha-user-row">
-        {/* User identity row — not clickable, just displays who is signed in */}
         <div className="ha-user-identity">
           <div className="ha-avatar">{abb}</div>
           {!collapsed && (
@@ -1212,17 +2104,9 @@ const Sidebar: React.FC<{
             </div>
           )}
         </div>
-
-        {/* Sign out button — clearly labelled with icon */}
-        <button
-          className="ha-signout-btn"
-          onClick={onSignOut}
-          type="button"
-          title="Sign out"
-        >
+        <button className="ha-signout-btn" onClick={onSignOut} type="button" title="Sign out">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" strokeWidth="2.2"
-               strokeLinecap="round" strokeLinejoin="round">
+               stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
@@ -1235,43 +2119,74 @@ const Sidebar: React.FC<{
 };
 
 // ─── Header ───────────────────────────────────────────────────────────────────
+// UPDATED: accepts onSignOut so the hover-card "Sign out" link works;
+// card now matches the Patient-screen style (avatar · name · role · email ·
+// divider · View/Edit Profile · Sign out).
 
-const Header: React.FC<{ title: string; onHamburger: () => void; adminName: string; onProfileClick: () => void }> =
-  ({ title, onHamburger, adminName, onProfileClick }) => {
-    const [search, setSearch] = useState('');
-    const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    return (
-      <header className="ha-header">
-        <button className="ha-hamburger" onClick={onHamburger} aria-label="Open menu">
-          <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
-        </button>
-        <div>
-          <div className="ha-header-title">{title}</div>
-          <div className="ha-header-date">{today}</div>
+const Header: React.FC<{
+  title: string;
+  onHamburger: () => void;
+  adminName: string;
+  onProfileClick: () => void;
+  onSignOut?: () => void;
+}> = ({ title, onHamburger, adminName, onProfileClick, onSignOut }) => {
+  const [search, setSearch] = useState('');
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const abb = initials(adminName);
+
+  return (
+    <header className="ha-header">
+      <button className="ha-hamburger" onClick={onHamburger} aria-label="Open menu">
+        <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
+      </button>
+      <div>
+        <div className="ha-header-title">{title}</div>
+        <div className="ha-header-date">{today}</div>
+      </div>
+      <div className="ha-header-spacer" />
+      <div className="ha-search-box">
+        <SvgIcon path="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" size={14} color="var(--text-muted)" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patients, records..." />
+      </div>
+      <button className="ha-help-btn" aria-label="Help">
+        <SvgIcon path="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" size={15} color="currentColor" />
+        <span>Help</span>
+      </button>
+
+      {/* ── Profile wrap — hover shows Patient-style card ── */}
+      <div className="ha-profile-wrap">
+        {/* Clicking the avatar opens the full-screen profile modal */}
+        <div className="ha-header-avatar" onClick={onProfileClick}>{abb}</div>
+
+        {/* Hover card */}
+        <div className="ha-profile-tooltip">
+          <div className="ha-tt-avatar">{abb}</div>
+          <div className="ha-tt-name">{adminName}</div>
+          <div className="ha-tt-sub">Administrator</div>
+          <div className="ha-tt-sub">admin@vexoo.in</div>
+          <div className="ha-tt-divider" />
+          <button className="ha-tt-action profile" onClick={onProfileClick}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            View / Edit Profile
+          </button>
+          <button className="ha-tt-action signout" onClick={onSignOut}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign out
+          </button>
         </div>
-        <div className="ha-header-spacer" />
-        <div className="ha-search-box">
-          <SvgIcon path="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" size={14} color="var(--text-muted)" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patients, records..." />
-        </div>
-        <button className="ha-icon-btn" aria-label="Notifications">
-          <SvgIcon path="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" size={15} color="currentColor" />
-          <span>Help</span>
-        </button>
-        <div className="ha-profile-wrap">
-          <div className="ha-header-avatar" onClick={onProfileClick}>
-            {initials(adminName)}
-            <div className="ha-profile-tooltip">
-              <div style={{ fontWeight:700, fontSize:13 }}>{adminName}</div>
-              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>Administrator</div>
-              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>admin@vexoo.in</div>
-              <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
-            </div>
-          </div>
-        </div>
-      </header>
-    );
-  };
+      </div>
+    </header>
+  );
+};
 
 // ─── Root component ───────────────────────────────────────────────────────────
 
@@ -1302,6 +2217,7 @@ export default function HospitalAdminScreen({ adminName = 'Anita Reddy', onSignO
       case 'inventory':     return <InventoryModule />;
       case 'analytics':     return <AnalyticsModule />;
       case 'notifications': return <NotificationsModule />;
+      case 'staff':         return <StaffScreen hospitalName="Apollo Multispecialty" />;
       default:              return <Dashboard setModule={setModule} />;
     }
   }, [module]);
@@ -1329,6 +2245,7 @@ export default function HospitalAdminScreen({ adminName = 'Anita Reddy', onSignO
             onHamburger={() => setMobileOpen(o => !o)}
             adminName={adminName}
             onProfileClick={() => setShowProfile(true)}
+            onSignOut={onSignOut}
           />
           {moduleEl}
         </div>
