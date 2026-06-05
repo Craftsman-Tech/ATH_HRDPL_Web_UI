@@ -2,37 +2,24 @@
  * ============================================================================
  *  PharmacistScreen.tsx — Pharmacist Portal
  * ============================================================================
- *  Dark-green sidebar, light body portal for pharmacy staff.
- *  Faithfully ported from Vexoo_Pharmacist.html.
- *
- *  Screens (6):
- *    Prescription Queue · Verification · Drug Inventory
- *    Dispensing Log · Drug Interactions · Reports & Analytics
- *
  *  Route:           /pharmacy  (protected, role === 'Pharmacist')
  *  Suggested path:  apps/web/src/screens/pharmacist/PharmacistScreen.tsx
  *
- *  Props:
- *    pharmacistName?  — from AuthContext (e.g. "Mei Perez")
- *    onSignOut?       — called when Logout is clicked
- *
- *  FIX (Jun 2026):
- *  - Header now shows clickable profile avatar (top-right) with hover tooltip
- *    displaying user details. Click opens an editable profile modal.
- *  - Single Sign out button only in sidebar. No duplicate logout in header.
+ *  UPDATED (Jun 2026):
+ *  - Header profile card matches the Patient-screen style:
+ *    avatar · name · role · email · divider · View/Edit Profile · Sign out
+ *  - ::before bridge eliminates the hover-gap so the card stays open while
+ *    the user moves the cursor down toward the Sign out button.
  * ============================================================================
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ScreenId  = 'queue' | 'verify' | 'stock' | 'history' | 'interact' | 'reports';
 type RxStatus  = 'Pending' | 'Verifying' | 'Ready' | 'Dispensed';
 type ChipColor = 'primary' | 'amber' | 'rose' | 'blue' | 'green' | 'purple' | 'gray';
 
 interface NavItem { id: ScreenId; label: string; path: string; badge?: number; }
-
 interface Prescription {
   id: string; patient: string; pid: string; drug: string; qty: number;
   doctor: string; time: string; status: RxStatus; refills: number;
@@ -44,14 +31,10 @@ interface StockItem {
   supplier: string; reorderQty: number;
 }
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-
 interface PharmacistScreenProps {
   pharmacistName?: string;
   onSignOut?: () => void;
 }
-
-// ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -75,16 +58,11 @@ const CSS = `
   --muted:   #64748b;
   --border:  #e4e8f0;
   --card:    #fff;
-
   font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
+  background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden; display: flex;
 }
-
-.ph-root ::-webkit-scrollbar       { width: 5px; height: 5px; }
+.ph-root ::-webkit-scrollbar { width: 5px; height: 5px; }
 .ph-root ::-webkit-scrollbar-thumb { background: #cdd4d3; border-radius: 4px; }
 .ph-root ::-webkit-scrollbar-track { background: transparent; }
 
@@ -93,15 +71,12 @@ const CSS = `
 
 /* ── Sidebar ── */
 .ph-sidebar {
-  width: 228px; flex-shrink: 0;
-  background: var(--sidebar);
-  display: flex; flex-direction: column;
-  height: 100vh; overflow-y: auto;
+  width: 228px; flex-shrink: 0; background: var(--sidebar);
+  display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
   transition: transform 0.25s cubic-bezier(.4,0,.2,1);
 }
 .ph-sidebar-logo {
-  padding: 18px 20px;
-  display: flex; align-items: center; gap: 10px;
+  padding: 18px 20px; display: flex; align-items: center; gap: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 .ph-logo-icon {
@@ -109,31 +84,21 @@ const CSS = `
   border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .ph-sidebar-stats {
-  padding: 14px 14px 8px;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  padding: 14px 14px 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
 }
-.ph-stat-pill {
-  background: rgba(255,255,255,0.07); border-radius: 10px;
-  padding: 10px 12px; text-align: center;
-}
+.ph-stat-pill { background: rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px; text-align: center; }
 .ph-nav { flex: 1; padding: 8px 10px; }
 .ph-nav-btn {
   display: flex; align-items: center; gap: 11px;
   width: 100%; padding: 10px 13px; border-radius: 10px;
   border: none; cursor: pointer; margin-bottom: 2px;
-  font-size: 13.5px; font-family: 'Plus Jakarta Sans', sans-serif;
-  transition: all 0.13s;
+  font-size: 13.5px; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.13s;
 }
 .ph-nav-btn.active   { background: var(--primary); color: white; font-weight: 600; }
 .ph-nav-btn.inactive { background: transparent; color: rgba(255,255,255,0.55); font-weight: 400; }
 .ph-nav-btn.inactive:hover { background: rgba(255,255,255,0.07); color: white; }
-.ph-nav-badge {
-  background: var(--rose); color: white;
-  font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px;
-}
-.ph-sidebar-footer {
-  border-top: 1px solid rgba(255,255,255,0.07); padding: 12px;
-}
+.ph-nav-badge { background: var(--rose); color: white; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+.ph-sidebar-footer { border-top: 1px solid rgba(255,255,255,0.07); padding: 12px; }
 .ph-user-identity {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px;
   border-radius: 10px; margin-bottom: 8px;
@@ -152,12 +117,55 @@ const CSS = `
   padding: 9px 13px; border-radius: 10px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.55); font-size: 13px; font-weight: 500;
-  font-family: inherit; cursor: pointer; width: 100%; transition: background 0.13s, color 0.13s, border-color 0.13s;
+  font-family: inherit; cursor: pointer; width: 100%;
+  transition: background 0.13s, color 0.13s, border-color 0.13s;
 }
-.ph-logout-btn:hover {
-  background: rgba(225,29,72,0.12); color: #f87171;
-  border-color: rgba(225,29,72,0.25);
+.ph-logout-btn:hover { background: rgba(225,29,72,0.12); color: #f87171; border-color: rgba(225,29,72,0.25); }
+
+/* ── Profile wrap — Patient-style hover card ── */
+.ph-profile-wrap { position: relative; }
+.ph-profile-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #0891b2);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px;
+  cursor: pointer; flex-shrink: 0; transition: box-shadow 0.15s;
 }
+.ph-profile-wrap:hover .ph-profile-avatar { box-shadow: 0 0 0 3px rgba(13,148,136,0.25); }
+
+.ph-profile-tooltip {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; min-width: 230px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+  z-index: 1000;
+}
+
+.ph-profile-wrap:hover .ph-profile-tooltip { display: block; }
+.ph-profile-tooltip::before {
+  content: ''; position: absolute;
+  top: -12px; left: 0; right: 0; height: 12px;
+}
+.ph-tt-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #0891b2);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 16px; margin-bottom: 12px;
+}
+.ph-tt-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.ph-tt-sub  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.ph-tt-divider { height: 1px; background: var(--border); margin: 12px 0; }
+.ph-tt-action {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 10px; border-radius: 9px; border: none; background: transparent;
+  font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.13s;
+}
+.ph-tt-action svg { flex-shrink: 0; }
+.ph-tt-action.profile { color: var(--primary); }
+.ph-tt-action.profile:hover { background: var(--pl); }
+.ph-tt-action.signout { color: var(--rose); }
+.ph-tt-action.signout:hover { background: var(--rl); }
 
 /* mobile overlay */
 .ph-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9; }
@@ -173,7 +181,9 @@ const CSS = `
   display: flex; align-items: center; padding: 0 24px; height: 60px;
   background: var(--card); border-bottom: 1px solid var(--border);
   gap: 14px; flex-shrink: 0;
+  position: relative; z-index: 15;
 }
+
 .ph-header-title  { font-weight: 700; font-size: 17px; }
 .ph-header-spacer { flex: 1; }
 .ph-search-box {
@@ -181,40 +191,12 @@ const CSS = `
   background: var(--bg); border: 1px solid var(--border);
   border-radius: 10px; padding: 7px 14px; width: 220px;
 }
-.ph-search-box input {
-  border: none; outline: none; background: transparent;
-  font-size: 13px; width: 100%; font-family: inherit; color: var(--text);
-}
+.ph-search-box input { border: none; outline: none; background: transparent; font-size: 13px; width: 100%; font-family: inherit; color: var(--text); }
 .ph-header-date { font-size: 12px; color: var(--muted); }
-
-/* ── Profile avatar + tooltip ── */
-.ph-profile-wrap { position: relative; }
-.ph-profile-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), #0891b2);
-  display: flex; align-items: center; justify-content: center;
-  color: white; font-weight: 700; font-size: 13px;
-  cursor: pointer; flex-shrink: 0; transition: opacity 0.15s;
-}
-.ph-profile-avatar:hover { opacity: 0.85; }
-.ph-profile-tooltip {
-  position: absolute; top: calc(100% + 10px); right: 0;
-  background: white; border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  min-width: 200px; z-index: 100; pointer-events: none;
-  opacity: 0; transform: translateY(-4px);
-  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
-}
-.ph-profile-wrap:hover .ph-profile-tooltip { opacity: 1; transform: translateY(0); }
-
 .ph-scroll { flex: 1; overflow-y: auto; }
 
 /* ── Card ── */
-.ph-card {
-  background: var(--card); border-radius: 16px; padding: 20px;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.05); border: 1px solid var(--border);
-}
+.ph-card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 2px 16px rgba(0,0,0,0.05); border: 1px solid var(--border); }
 
 /* ── Chip ── */
 .ph-chip { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; display: inline-block; }
@@ -226,7 +208,7 @@ const CSS = `
 .ph-chip-purple  { background: var(--pul); color: var(--purple);  }
 .ph-chip-gray    { background: #f1f5f9;    color: var(--muted);   }
 
-/* ── Table shared ── */
+/* ── Table ── */
 .ph-table { width: 100%; border-collapse: collapse; }
 .ph-th { padding: 9px 18px; text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
 .ph-td { padding: 12px 18px; font-size: 13px; }
@@ -241,52 +223,27 @@ const CSS = `
 .ph-queue-stat   { border-radius: 12px; padding: 12px 14px; text-align: center; border-width: 1px; border-style: solid; }
 .ph-rx-row {
   border-radius: 13px; padding: 14px 18px; cursor: pointer; transition: all 0.15s;
-  display: flex; align-items: center; gap: 14px; margin-bottom: 8px;
-  border-style: solid;
+  display: flex; align-items: center; gap: 14px; margin-bottom: 8px; border-style: solid;
 }
 .ph-rx-row.selected { background: var(--pl); border-color: var(--primary); border-width: 1.5px; }
 .ph-rx-row.normal   { background: var(--card); border-color: var(--border); border-width: 1px; }
 .ph-rx-row:hover    { border-color: var(--primary); }
 .ph-detail-header { background: linear-gradient(135deg,#1b2e2c,#0d4038); padding: 20px 22px; color: white; }
-.ph-detail-section {
-  background: var(--bg); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border);
-}
+.ph-detail-section { background: var(--bg); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); }
 .ph-section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
-.ph-detail-row { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 12px; }
-.ph-patient-avatar {
-  width: 40px; height: 40px; border-radius: 50%; background: var(--pl);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; color: var(--primary); font-size: 13px; flex-shrink: 0;
-}
+.ph-detail-row    { display: flex; justify-content: space-between; margin-bottom: 8px; gap: 12px; }
+.ph-patient-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--pl); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--primary); font-size: 13px; flex-shrink: 0; }
 .ph-interaction-box { background: #fffef5; border: 1px solid #fcd34d; border-radius: 12px; padding: 12px 14px; }
-.ph-dispense-btn {
-  background: var(--primary); color: white; border: none; border-radius: 12px;
-  padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer;
-  width: 100%; font-family: inherit; transition: opacity 0.13s;
-}
+.ph-dispense-btn { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer; width: 100%; font-family: inherit; transition: opacity 0.13s; }
 .ph-dispense-btn:hover { opacity: 0.88; }
-.ph-dispensed-banner {
-  background: var(--gl); border: 1px solid var(--green); border-radius: 12px;
-  padding: 13px; text-align: center; color: var(--green); font-weight: 700; font-size: 14px;
-}
-.ph-print-btn {
-  background: var(--bg); color: var(--muted); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px; font-size: 13.5px; cursor: pointer;
-  width: 100%; font-family: inherit; transition: background 0.13s;
-}
-.ph-print-btn:hover { background: var(--border); }
+.ph-dispensed-banner { background: var(--gl); border: 1px solid var(--green); border-radius: 12px; padding: 13px; text-align: center; color: var(--green); font-weight: 700; font-size: 14px; }
+.ph-print-btn { background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 12px; padding: 10px; font-size: 13.5px; cursor: pointer; width: 100%; font-family: inherit; }
 
 /* ── Verification ── */
-.ph-verify-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px; border-radius: 10px; cursor: pointer; border: 1px solid;
-}
+.ph-verify-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; cursor: pointer; border: 1px solid; }
 .ph-verify-item.done    { background: var(--gl); border-color: var(--green); }
 .ph-verify-item.pending { background: var(--bg); border-color: var(--border); }
-.ph-verify-recent-row {
-  display: flex; align-items: center; gap: 14px;
-  padding: 11px 0; border-bottom: 1px solid var(--border);
-}
+.ph-verify-recent-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .ph-verify-recent-row:last-child { border-bottom: none; }
 
 /* ── Stock ── */
@@ -294,35 +251,17 @@ const CSS = `
 .ph-stock-stat  { text-align: center; padding: 16px; }
 .ph-stock-bar-wrap { background: #f1f5f9; border-radius: 4px; height: 7px; overflow: hidden; min-width: 60px; }
 .ph-stock-bar { height: 100%; border-radius: 4px; transition: width 0.4s; }
-.ph-stock-action-btn {
-  border-radius: 8px; padding: 5px 12px; font-size: 12px;
-  cursor: pointer; font-weight: 500; font-family: inherit;
-}
+.ph-stock-action-btn { border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 500; font-family: inherit; }
 
 /* ── History ── */
 .ph-history-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
 
 /* ── Interactions ── */
 .ph-interact-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.ph-drug-input {
-  padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px;
-  font-size: 13.5px; outline: none; background: var(--bg);
-  font-family: inherit; color: var(--text); width: 100%;
-  transition: border-color 0.15s;
-}
+.ph-drug-input { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 13.5px; outline: none; background: var(--bg); font-family: inherit; color: var(--text); width: 100%; transition: border-color 0.15s; }
 .ph-drug-input:focus { border-color: var(--primary); }
-.ph-add-drug-btn {
-  background: var(--bg); border: 1.5px dashed var(--border); border-radius: 10px;
-  padding: 10px; font-size: 13px; color: var(--muted); cursor: pointer;
-  font-family: inherit; width: 100%; transition: border-color 0.13s;
-}
-.ph-add-drug-btn:hover { border-color: var(--primary); color: var(--primary); }
-.ph-check-btn {
-  background: var(--primary); color: white; border: none; border-radius: 10px;
-  padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
-  width: 100%; font-family: inherit; transition: opacity 0.13s;
-}
-.ph-check-btn:hover { opacity: 0.88; }
+.ph-add-drug-btn { background: var(--bg); border: 1.5px dashed var(--border); border-radius: 10px; padding: 10px; font-size: 13px; color: var(--muted); cursor: pointer; font-family: inherit; width: 100%; }
+.ph-check-btn { background: var(--primary); color: white; border: none; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; width: 100%; font-family: inherit; }
 
 /* ── Reports ── */
 .ph-reports-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -332,10 +271,7 @@ const CSS = `
 
 /* ── Responsive ── */
 @media (max-width: 1080px) {
-  .ph-sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 20;
-    transform: translateX(-100%);
-  }
+  .ph-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 20; transform: translateX(-100%); }
   .ph-sidebar.mobile-open { transform: translateX(0); }
   .ph-hamburger { display: flex !important; }
   .ph-queue-layout { grid-template-columns: 1fr; }
@@ -344,10 +280,9 @@ const CSS = `
   .ph-reports-layout  { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .ph-queue-stats  { grid-template-columns: repeat(2,1fr); }
-  .ph-stock-stats  { grid-template-columns: repeat(2,1fr); }
-  .ph-history-stats{ grid-template-columns: repeat(2,1fr); }
-  .ph-search-box   { display: none; }
+  .ph-queue-stats { grid-template-columns: repeat(2,1fr); }
+  .ph-stock-stats { grid-template-columns: repeat(2,1fr); }
+  .ph-search-box  { display: none; }
 }
 `;
 
@@ -401,16 +336,9 @@ function rxLeftBorderColor(s: string) {
 function Chip({ label, color = 'primary' }: { label: string; color?: ChipColor }) {
   return <span className={`ph-chip ph-chip-${color}`}>{label}</span>;
 }
-
 function SvgIcon({ path, size = 17, color = 'currentColor' }: { path: string; size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ flexShrink: 0 }}>
-      <path d={path} />
-    </svg>
-  );
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ flexShrink: 0 }}><path d={path} /></svg>;
 }
-
-// ─── Nav config ───────────────────────────────────────────────────────────────
 
 const NAV: NavItem[] = [
   { id:'queue',    label:'Prescription Queue', badge:3, path:'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z' },
@@ -426,8 +354,6 @@ const SCREEN_TITLES: Record<ScreenId, string> = {
   history:'Dispensing Log', interact:'Drug Interaction Checker', reports:'Reports & Analytics',
 };
 
-// ─── Screen: Queue ────────────────────────────────────────────────────────────
-
 const NEXT_STATUS: Record<RxStatus, RxStatus> = {
   Pending:'Verifying', Verifying:'Ready', Ready:'Dispensed', Dispensed:'Dispensed',
 };
@@ -435,70 +361,70 @@ const ACTION_LABEL: Record<RxStatus, string> = {
   Pending:'Start Verification', Verifying:'Mark Ready', Ready:'Dispense', Dispensed:'Completed',
 };
 
+// ─── Screen: Queue ────────────────────────────────────────────────────────────
+
 const QueueScreen: React.FC = () => {
   const [sel, setSel] = useState<Prescription>(PRESCRIPTIONS[0]);
   const [statuses, setStatuses] = useState<Record<string, RxStatus>>(
     () => Object.fromEntries(PRESCRIPTIONS.map(r => [r.id, r.status]))
   );
-
   const advance = () => {
     const cur = statuses[sel.id];
     if (cur === 'Dispensed') return;
     setStatuses(s => ({ ...s, [sel.id]: NEXT_STATUS[cur] }));
   };
-
-  const counts: Record<string, number> = useMemo(() => {
+  const counts = useMemo(() => {
     const c: Record<string, number> = { Pending:0, Verifying:0, Ready:0, Dispensed:0 };
     Object.values(statuses).forEach(s => { c[s] = (c[s] || 0) + 1; });
     return c;
   }, [statuses]);
-
   const curStatus = statuses[sel.id];
   const hasInteraction = sel.drug.includes('Amiodarone');
-
   return (
     <div className="ph-queue-layout ph-fade">
       <div className="ph-queue-list">
         <div className="ph-queue-stats">
-          {([['Pending','var(--amber)','var(--al)'],['Verifying','var(--blue)','var(--bl)'],['Ready','var(--primary)','var(--pl)'],['Dispensed','var(--green)','var(--gl)']] as [string,string,string][]).map(([l,c,bg]) => (
-            <div key={l} className="ph-queue-stat" style={{ background:bg, borderColor:'var(--border)' }}>
-              <div style={{ fontSize:24, fontWeight:800, color:c }}>{counts[l] || 0}</div>
-              <div style={{ fontSize:12, color:c, marginTop:2, fontWeight:500 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display:'flex', flexDirection:'column' }}>
-          {PRESCRIPTIONS.map(rx => {
-            const st = statuses[rx.id];
+          {(['Pending','Verifying','Ready','Dispensed'] as RxStatus[]).map((l,_,arr) => {
+            const colors: Record<string,[string,string]> = {
+              Pending:['var(--amber)','var(--al)'], Verifying:['var(--blue)','var(--bl)'],
+              Ready:['var(--primary)','var(--pl)'], Dispensed:['var(--green)','var(--gl)'],
+            };
+            const [c,bg] = colors[l];
             return (
-              <div key={rx.id} className={`ph-rx-row ${sel.id === rx.id ? 'selected' : 'normal'}`}
-                style={{ borderLeftWidth:4, borderLeftStyle:'solid', borderLeftColor: rxLeftBorderColor(st) }}
-                onClick={() => setSel(rx)}>
-                <div style={{ flex:1 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                    <span style={{ fontWeight:700, fontSize:14 }}>{rx.patient}</span>
-                    <span style={{ fontSize:12, color:'var(--muted)' }}>{rx.time}</span>
-                  </div>
-                  <div style={{ fontSize:13, color:'var(--muted)', marginBottom:6 }}>{rx.id} · {rx.drug} × {rx.qty}</div>
-                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                    <span style={{ fontSize:12, color:'var(--muted)' }}>{rx.doctor}</span>
-                    <Chip label={st} color={rxStatusColor(st)} />
-                  </div>
-                </div>
+              <div key={l} className="ph-queue-stat" style={{ background:bg, borderColor:'var(--border)' }}>
+                <div style={{ fontSize:24, fontWeight:800, color:c }}>{counts[l] || 0}</div>
+                <div style={{ fontSize:12, color:c, marginTop:2, fontWeight:500 }}>{l}</div>
               </div>
             );
           })}
         </div>
+        {PRESCRIPTIONS.map(rx => {
+          const st = statuses[rx.id];
+          return (
+            <div key={rx.id} className={`ph-rx-row ${sel.id === rx.id ? 'selected' : 'normal'}`}
+              style={{ borderLeftWidth:4, borderLeftStyle:'solid', borderLeftColor: rxLeftBorderColor(st) }}
+              onClick={() => setSel(rx)}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                  <span style={{ fontWeight:700, fontSize:14 }}>{rx.patient}</span>
+                  <span style={{ fontSize:12, color:'var(--muted)' }}>{rx.time}</span>
+                </div>
+                <div style={{ fontSize:13, color:'var(--muted)', marginBottom:6 }}>{rx.id} · {rx.drug} × {rx.qty}</div>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <span style={{ fontSize:12, color:'var(--muted)' }}>{rx.doctor}</span>
+                  <Chip label={st} color={rxStatusColor(st)} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
       <div className="ph-queue-detail">
         <div className="ph-detail-header">
           <div style={{ fontSize:12, opacity:0.6, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.8px' }}>Prescription Detail</div>
           <div style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{sel.id}</div>
           <div style={{ opacity:0.75, fontSize:13 }}>Prescribed by {sel.doctor}</div>
         </div>
-
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
           <div className="ph-detail-section">
             <div className="ph-section-label">Patient</div>
@@ -513,17 +439,15 @@ const QueueScreen: React.FC = () => {
               ⚠ Allergies: {sel.allergies}
             </div>
           </div>
-
           <div className="ph-detail-section">
             <div className="ph-section-label">Drug Details</div>
-            {([['Medication', sel.drug], ['Quantity', `${sel.qty} units`], ['Refills Remaining', `${sel.refills} refills`], ['Instructions', sel.instructions]] as [string,string][]).map(([k, v]) => (
+            {([['Medication', sel.drug], ['Quantity', `${sel.qty} units`], ['Refills Remaining', `${sel.refills} refills`], ['Instructions', sel.instructions]] as [string,string][]).map(([k,v]) => (
               <div key={k} className="ph-detail-row">
                 <span style={{ fontSize:12, color:'var(--muted)', flexShrink:0 }}>{k}</span>
                 <span style={{ fontSize:12.5, fontWeight:500, textAlign:'right' }}>{v}</span>
               </div>
             ))}
           </div>
-
           <div className="ph-interaction-box">
             <div style={{ fontWeight:700, fontSize:13, color:'#92400e', marginBottom:6 }}>Interaction Check</div>
             <div style={{ fontSize:12.5, color:'#78350f', lineHeight:1.6 }}>
@@ -532,12 +456,9 @@ const QueueScreen: React.FC = () => {
                 : '✓ No significant drug interactions detected for this patient.'}
             </div>
           </div>
-
-          {curStatus !== 'Dispensed' ? (
-            <button className="ph-dispense-btn" onClick={advance}>{ACTION_LABEL[curStatus]}</button>
-          ) : (
-            <div className="ph-dispensed-banner">✓ Dispensed Successfully</div>
-          )}
+          {curStatus !== 'Dispensed'
+            ? <button className="ph-dispense-btn" onClick={advance}>{ACTION_LABEL[curStatus]}</button>
+            : <div className="ph-dispensed-banner">✓ Dispensed Successfully</div>}
           <button className="ph-print-btn">Print Label</button>
         </div>
       </div>
@@ -548,7 +469,6 @@ const QueueScreen: React.FC = () => {
 // ─── Screen: Verification ─────────────────────────────────────────────────────
 
 type CheckItem = { label: string; checked: boolean };
-
 const INITIAL_CHECKLIST: CheckItem[] = [
   { label:'Patient identity confirmed (ID checked)',         checked:true  },
   { label:'Prescriber credentials verified',                checked:true  },
@@ -563,7 +483,6 @@ const INITIAL_CHECKLIST: CheckItem[] = [
 const VerifyScreen: React.FC = () => {
   const [items, setItems] = useState<CheckItem[]>(INITIAL_CHECKLIST);
   const toggle = (i: number) => setItems(list => list.map((x, j) => j === i ? { ...x, checked: !x.checked } : x));
-
   return (
     <div className="ph-scroll ph-fade" style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
       <div className="ph-card">
@@ -571,34 +490,28 @@ const VerifyScreen: React.FC = () => {
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {items.map((item, i) => (
             <label key={i} className={`ph-verify-item ${item.checked ? 'done' : 'pending'}`} onClick={() => toggle(i)}>
-              <input type="checkbox" checked={item.checked} onChange={() => toggle(i)}
-                style={{ accentColor:'var(--primary)', width:16, height:16 }} />
-              <span style={{ fontSize:13.5, fontWeight:500, color: item.checked ? 'var(--green)' : 'var(--text)', flex:1 }}>{item.label}</span>
+              <input type="checkbox" checked={item.checked} onChange={() => toggle(i)} style={{ accentColor:'var(--primary)', width:16, height:16 }} />
+              <span style={{ fontSize:13.5, fontWeight:500, color: item.checked?'var(--green)':'var(--text)', flex:1 }}>{item.label}</span>
               {item.checked && <SvgIcon path="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" size={14} color="var(--green)" />}
             </label>
           ))}
         </div>
         <div style={{ display:'flex', gap:10, marginTop:16 }}>
-          <button style={{ background:'var(--primary)', color:'white', border:'none', borderRadius:10, padding:'11px 24px', fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-            Approve & Move to Ready
-          </button>
-          <button style={{ background:'var(--rl)', color:'var(--rose)', border:'1px solid var(--rose)', borderRadius:10, padding:'11px 22px', fontSize:13.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
-            Flag Issue
-          </button>
+          <button style={{ background:'var(--primary)', color:'white', border:'none', borderRadius:10, padding:'11px 24px', fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Approve & Move to Ready</button>
+          <button style={{ background:'var(--rl)', color:'var(--rose)', border:'1px solid var(--rose)', borderRadius:10, padding:'11px 22px', fontSize:13.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Flag Issue</button>
         </div>
       </div>
-
       <div className="ph-card">
         <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>Recent Verifications — Today</div>
         {([['RX-4821','Sarah Johnson','Lisinopril 10mg','Approved','08:52 AM'],
            ['RX-4822','Marcus Williams','Metformin 500mg','Approved','09:45 AM'],
-           ['RX-4820','David Nguyen','Amlodipine 5mg','Flagged','10:10 AM']] as [string,string,string,string,string][]).map(([id, p, d, st, t]) => (
+           ['RX-4820','David Nguyen','Amlodipine 5mg','Flagged','10:10 AM']] as [string,string,string,string,string][]).map(([id,p,d,st,t]) => (
           <div key={id} className="ph-verify-recent-row">
             <div style={{ flex:1 }}>
               <div style={{ fontWeight:600, fontSize:13.5 }}>{p} — {d}</div>
               <div style={{ fontSize:12, color:'var(--muted)' }}>{id} · {t}</div>
             </div>
-            <Chip label={st} color={st === 'Approved' ? 'primary' : st === 'Flagged' ? 'rose' : 'amber'} />
+            <Chip label={st} color={st==='Approved'?'primary':st==='Flagged'?'rose':'amber'} />
           </div>
         ))}
       </div>
@@ -611,51 +524,38 @@ const VerifyScreen: React.FC = () => {
 const StockScreen: React.FC = () => (
   <div className="ph-scroll ph-fade" style={{ padding:20 }}>
     <div className="ph-stock-stats">
-      {([['Total Items','8','var(--primary)'],['OK','5','var(--green)'],['Low','2','var(--amber)'],['Critical','1','var(--rose)']] as [string,string,string][]).map(([l, v, c]) => (
+      {([['Total Items','8','var(--primary)'],['OK','5','var(--green)'],['Low','2','var(--amber)'],['Critical','1','var(--rose)']] as [string,string,string][]).map(([l,v,c]) => (
         <div key={l} className="ph-card ph-stock-stat">
           <div style={{ fontSize:28, fontWeight:800, color:c }}>{v}</div>
           <div style={{ fontSize:12.5, color:'var(--muted)', marginTop:2 }}>{l}</div>
         </div>
       ))}
     </div>
-
     <div className="ph-card" style={{ padding:0, overflow:'hidden' }}>
       <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', fontWeight:700, fontSize:15 }}>Drug Inventory</div>
       <div style={{ overflowX:'auto' }}>
         <table className="ph-table">
-          <thead>
-            <tr>
-              {['Drug Name','Category','Stock','Min','Max','Stock Level','Expiry','Status',''].map(h => (
-                <th key={h} className="ph-th">{h}</th>
-              ))}
-            </tr>
-          </thead>
+          <thead><tr>{['Drug Name','Category','Stock','Min','Max','Stock Level','Expiry','Status',''].map(h => <th key={h} className="ph-th">{h}</th>)}</tr></thead>
           <tbody>
             {STOCK.map((s, i) => {
               const st = stockStatus(s.qty, s.min);
               const pct = Math.min(100, (s.qty / s.max) * 100);
-              const barColor = st === 'Critical' ? 'var(--rose)' : st === 'Low' ? 'var(--amber)' : 'var(--primary)';
+              const barColor = st==='Critical'?'var(--rose)':st==='Low'?'var(--amber)':'var(--primary)';
               return (
-                <tr key={s.id} className="ph-tr"
-                  style={{ borderBottom: i < STOCK.length - 1 ? '1px solid var(--border)' : 'none', background: st === 'Critical' ? '#fff8f8' : undefined }}>
+                <tr key={s.id} className="ph-tr" style={{ borderBottom: i < STOCK.length-1?'1px solid var(--border)':'none', background: st==='Critical'?'#fff8f8':undefined }}>
                   <td className="ph-td" style={{ fontWeight:700, fontSize:13.5 }}>{s.name}</td>
                   <td className="ph-td"><Chip label={s.category} color="gray" /></td>
-                  <td className="ph-td" style={{ fontWeight:700, fontSize:14, color: st === 'Critical' ? 'var(--rose)' : st === 'Low' ? 'var(--amber)' : 'var(--text)' }}>
-                    {s.qty.toLocaleString()}
-                  </td>
+                  <td className="ph-td" style={{ fontWeight:700, fontSize:14, color: st==='Critical'?'var(--rose)':st==='Low'?'var(--amber)':'var(--text)' }}>{s.qty.toLocaleString()}</td>
                   <td className="ph-td" style={{ color:'var(--muted)' }}>{s.min}</td>
                   <td className="ph-td" style={{ color:'var(--muted)' }}>{s.max}</td>
                   <td className="ph-td" style={{ minWidth:120 }}>
-                    <div className="ph-stock-bar-wrap">
-                      <div className="ph-stock-bar" style={{ width:`${pct}%`, background:barColor }} />
-                    </div>
+                    <div className="ph-stock-bar-wrap"><div className="ph-stock-bar" style={{ width:`${pct}%`, background:barColor }} /></div>
                   </td>
                   <td className="ph-td" style={{ color:'var(--muted)' }}>{s.expiry}</td>
-                  <td className="ph-td"><Chip label={st} color={st === 'Critical' ? 'rose' : st === 'Low' ? 'amber' : 'primary'} /></td>
+                  <td className="ph-td"><Chip label={st} color={st==='Critical'?'rose':st==='Low'?'amber':'primary'} /></td>
                   <td className="ph-td">
-                    <button className="ph-stock-action-btn"
-                      style={{ background: st !== 'OK' ? 'var(--primary)' : 'transparent', color: st !== 'OK' ? 'white' : 'var(--muted)', border: st !== 'OK' ? 'none' : '1px solid var(--border)' }}>
-                      {st !== 'OK' ? 'Reorder' : 'Adjust'}
+                    <button className="ph-stock-action-btn" style={{ background: st!=='OK'?'var(--primary)':'transparent', color: st!=='OK'?'white':'var(--muted)', border: st!=='OK'?'none':'1px solid var(--border)' }}>
+                      {st!=='OK'?'Reorder':'Adjust'}
                     </button>
                   </td>
                 </tr>
@@ -673,39 +573,32 @@ const StockScreen: React.FC = () => (
 const HistoryScreen: React.FC = () => (
   <div className="ph-scroll ph-fade" style={{ padding:20 }}>
     <div className="ph-history-stats">
-      {([['Dispensed Today','24','var(--primary)'],['This Week','142','var(--blue)'],['This Month','538','var(--purple)']] as [string,string,string][]).map(([l, v, c]) => (
+      {([['Dispensed Today','24','var(--primary)'],['This Week','142','var(--blue)'],['This Month','538','var(--purple)']] as [string,string,string][]).map(([l,v,c]) => (
         <div key={l} className="ph-card" style={{ padding:'16px 20px' }}>
           <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>{l}</div>
           <div style={{ fontSize:28, fontWeight:800, color:c }}>{v}</div>
         </div>
       ))}
     </div>
-
     <div className="ph-card" style={{ padding:0, overflow:'hidden' }}>
       <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', fontWeight:700, fontSize:15 }}>Dispensing Log — April 26, 2026</div>
       <div style={{ overflowX:'auto' }}>
         <table className="ph-table">
-          <thead>
-            <tr>
-              {['Time','Rx ID','Patient','Drug','Qty','Pharmacist','Status'].map(h => (
-                <th key={h} className="ph-th">{h}</th>
-              ))}
-            </tr>
-          </thead>
+          <thead><tr>{['Time','Rx ID','Patient','Drug','Qty','Pharmacist','Status'].map(h => <th key={h} className="ph-th">{h}</th>)}</tr></thead>
           <tbody>
-            {([['08:52 AM','RX-4819','David Nguyen','Amlodipine 5mg',30,'M. Perez','Dispensed'],
-               ['09:45 AM','RX-4820','Aisha Okonkwo','Sertraline 50mg',30,'M. Perez','Dispensed'],
-               ['10:30 AM','RX-4823',"James O'Brien",'Amiodarone 200mg',30,'M. Perez','Dispensed'],
-               ['11:15 AM','RX-4825','Priya Sharma','Sumatriptan 50mg',9,'M. Perez','Dispensed'],
-               ['01:00 PM','RX-4826','Thomas Klein','Tiotropium 18mcg',30,'M. Perez','Dispensed']] as string[][]).map((row, i) => (
-              <tr key={row[1]} className="ph-tr" style={{ borderBottom: i < 4 ? '1px solid var(--border)' : 'none' }}>
+            {([['08:52 AM','RX-4819','David Nguyen','Amlodipine 5mg',30,'M. Perez'],
+               ['09:45 AM','RX-4820','Aisha Okonkwo','Sertraline 50mg',30,'M. Perez'],
+               ['10:30 AM','RX-4823',"James O'Brien",'Amiodarone 200mg',30,'M. Perez'],
+               ['11:15 AM','RX-4825','Priya Sharma','Sumatriptan 50mg',9,'M. Perez'],
+               ['01:00 PM','RX-4826','Thomas Klein','Tiotropium 18mcg',30,'M. Perez']] as (string|number)[][]).map((row, i) => (
+              <tr key={String(row[1])} className="ph-tr" style={{ borderBottom: i<4?'1px solid var(--border)':'none' }}>
                 <td className="ph-td" style={{ color:'var(--muted)' }}>{row[0]}</td>
                 <td className="ph-td" style={{ fontWeight:600, color:'var(--primary)' }}>{row[1]}</td>
                 <td className="ph-td" style={{ fontWeight:500 }}>{row[2]}</td>
                 <td className="ph-td">{row[3]}</td>
                 <td className="ph-td">{row[4]}</td>
                 <td className="ph-td" style={{ color:'var(--muted)' }}>{row[5]}</td>
-                <td className="ph-td"><Chip label={row[6]} color="green" /></td>
+                <td className="ph-td"><Chip label="Dispensed" color="green" /></td>
               </tr>
             ))}
           </tbody>
@@ -720,7 +613,6 @@ const HistoryScreen: React.FC = () => (
 const InteractScreen: React.FC = () => {
   const [drugs, setDrugs] = useState(['', '']);
   const updateDrug = (i: number, val: string) => setDrugs(d => d.map((x, j) => j === i ? val : x));
-
   return (
     <div className="ph-scroll ph-fade" style={{ padding:20 }}>
       <div className="ph-interact-layout">
@@ -730,29 +622,24 @@ const InteractScreen: React.FC = () => {
           <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
             {drugs.map((d, i) => (
               <input key={i} value={d} onChange={e => updateDrug(i, e.target.value)}
-                placeholder={`Drug ${i + 1} name...`} className="ph-drug-input" />
+                placeholder={`Drug ${i+1} name...`} className="ph-drug-input" />
             ))}
             <button className="ph-add-drug-btn" onClick={() => setDrugs(d => [...d, ''])}>+ Add Drug</button>
           </div>
           <button className="ph-check-btn">Check Interactions</button>
         </div>
-
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <div className="ph-card" style={{ background:'var(--rl)', borderColor:'#fca5a5' }}>
-            <div style={{ fontWeight:700, fontSize:13.5, color:'var(--rose)', marginBottom:8 }}>🔴 Severe Interaction</div>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>Amiodarone + Warfarin</div>
-            <div style={{ fontSize:13, color:'#374151', lineHeight:1.6 }}>Amiodarone significantly increases Warfarin anticoagulant effect. Risk of bleeding. Reduce Warfarin dose by 30–50% and monitor INR closely.</div>
-          </div>
-          <div className="ph-card" style={{ background:'var(--al)', borderColor:'#fcd34d' }}>
-            <div style={{ fontWeight:700, fontSize:13.5, color:'var(--amber)', marginBottom:8 }}>🟡 Moderate Interaction</div>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>Lisinopril + NSAIDs</div>
-            <div style={{ fontSize:13, color:'#374151', lineHeight:1.6 }}>NSAIDs may reduce antihypertensive effect of Lisinopril and increase risk of renal impairment. Avoid concurrent use if possible.</div>
-          </div>
-          <div className="ph-card" style={{ background:'var(--gl)', borderColor:'#86efac' }}>
-            <div style={{ fontWeight:700, fontSize:13.5, color:'var(--green)', marginBottom:8 }}>🟢 No Known Interaction</div>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>Metformin + Aspirin</div>
-            <div style={{ fontSize:13, color:'#374151' }}>No clinically significant interaction known. Safe to use together.</div>
-          </div>
+          {[
+            { sev:'🔴 Severe Interaction', bg:'var(--rl)', bc:'#fca5a5', c:'var(--rose)', title:'Amiodarone + Warfarin', desc:'Amiodarone significantly increases Warfarin anticoagulant effect. Risk of bleeding. Reduce Warfarin dose by 30–50% and monitor INR closely.' },
+            { sev:'🟡 Moderate Interaction', bg:'var(--al)', bc:'#fcd34d', c:'var(--amber)', title:'Lisinopril + NSAIDs', desc:'NSAIDs may reduce antihypertensive effect of Lisinopril and increase risk of renal impairment. Avoid concurrent use if possible.' },
+            { sev:'🟢 No Known Interaction', bg:'var(--gl)', bc:'#86efac', c:'var(--green)', title:'Metformin + Aspirin', desc:'No clinically significant interaction known. Safe to use together.' },
+          ].map(({ sev, bg, bc, c, title, desc }) => (
+            <div key={title} className="ph-card" style={{ background:bg, borderColor:bc }}>
+              <div style={{ fontWeight:700, fontSize:13.5, color:c, marginBottom:8 }}>{sev}</div>
+              <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{title}</div>
+              <div style={{ fontSize:13, color:'#374151', lineHeight:1.6 }}>{desc}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -762,14 +649,12 @@ const InteractScreen: React.FC = () => {
 // ─── Screen: Reports ──────────────────────────────────────────────────────────
 
 const MONTHS     = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
-const DISPENSED  = [420, 480, 510, 380, 540, 590, 538];
+const DISPENSED  = [420,480,510,380,540,590,538];
 const MAX_DISP   = Math.max(...DISPENSED);
-const TOP_DRUGS: [string, number, string][] = [
-  ['Paracetamol 500mg',142,'var(--primary)'],
-  ['Metformin 500mg',  98, 'var(--blue)'],
-  ['Lisinopril 10mg',  87, 'var(--purple)'],
-  ['Atorvastatin 40mg',72, 'var(--amber)'],
-  ['Omeprazole 20mg',  65, 'var(--rose)'],
+const TOP_DRUGS: [string,number,string][] = [
+  ['Paracetamol 500mg',142,'var(--primary)'],['Metformin 500mg',98,'var(--blue)'],
+  ['Lisinopril 10mg',87,'var(--purple)'],['Atorvastatin 40mg',72,'var(--amber)'],
+  ['Omeprazole 20mg',65,'var(--rose)'],
 ];
 
 const ReportsScreen: React.FC = () => (
@@ -778,10 +663,10 @@ const ReportsScreen: React.FC = () => (
       <div className="ph-card">
         <div style={{ fontWeight:700, fontSize:15, marginBottom:16 }}>Monthly Dispensing Volume</div>
         <div className="ph-bar-chart">
-          {DISPENSED.map((v, i) => (
+          {DISPENSED.map((v,i) => (
             <div key={i} className="ph-bar-col">
-              {i === 6 && <div style={{ fontSize:10, color:'var(--primary)', fontWeight:700 }}>{v}</div>}
-              <div className="ph-bar-block" style={{ height:`${(v / MAX_DISP) * 90}px`, background:'var(--primary)', opacity: i === 6 ? 1 : 0.3 }} />
+              {i===6 && <div style={{ fontSize:10, color:'var(--primary)', fontWeight:700 }}>{v}</div>}
+              <div className="ph-bar-block" style={{ height:`${(v/MAX_DISP)*90}px`, background:'var(--primary)', opacity: i===6?1:0.3 }} />
               <span style={{ fontSize:10.5, color:'var(--muted)' }}>{MONTHS[i]}</span>
             </div>
           ))}
@@ -789,14 +674,14 @@ const ReportsScreen: React.FC = () => (
       </div>
       <div className="ph-card">
         <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>Top Dispensed Drugs — This Month</div>
-        {TOP_DRUGS.map(([d, n, c]) => (
+        {TOP_DRUGS.map(([d,n,c]) => (
           <div key={d} style={{ marginBottom:10 }}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
               <span style={{ fontSize:13, fontWeight:500 }}>{d}</span>
               <span style={{ fontSize:12.5, color:'var(--muted)' }}>{n} units</span>
             </div>
             <div style={{ background:'var(--bg)', borderRadius:4, height:6, overflow:'hidden' }}>
-              <div style={{ width:`${(n / 142) * 100}%`, height:'100%', background:c, borderRadius:4 }} />
+              <div style={{ width:`${(n/142)*100}%`, height:'100%', background:c, borderRadius:4 }} />
             </div>
           </div>
         ))}
@@ -825,16 +710,14 @@ const Sidebar: React.FC<{
           <div style={{ color:'rgba(255,255,255,0.4)', fontSize:10.5 }}>Pharmacy Portal</div>
         </div>
       </div>
-
       <div className="ph-sidebar-stats">
-        {([['Pending','3','var(--amber)'],['Ready','1','var(--primary)']] as [string,string,string][]).map(([l, v, c]) => (
+        {([['Pending','3','var(--amber)'],['Ready','1','var(--primary)']] as [string,string,string][]).map(([l,v,c]) => (
           <div key={l} className="ph-stat-pill">
             <div style={{ fontSize:20, fontWeight:800, color:c }}>{v}</div>
             <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.45)', marginTop:1 }}>{l}</div>
           </div>
         ))}
       </div>
-
       <nav className="ph-nav">
         {NAV.map(item => {
           const on = active === item.id;
@@ -847,8 +730,6 @@ const Sidebar: React.FC<{
           );
         })}
       </nav>
-
-      {/* Sidebar footer: user identity (read-only) + sign out button */}
       <div className="ph-sidebar-footer">
         <div className="ph-user-identity">
           <div className="ph-user-avatar">{abb}</div>
@@ -859,9 +740,7 @@ const Sidebar: React.FC<{
         </div>
         <button className="ph-logout-btn" onClick={onSignOut}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
           Sign out
         </button>
@@ -876,7 +755,6 @@ export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignO
   const [screen, setScreen]     = useState<ScreenId>('queue');
   const [mobileOpen, setMobile] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-
   const abb = initials(pharmacistName);
 
   useEffect(() => {
@@ -886,7 +764,6 @@ export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignO
   }, []);
 
   const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); }, []);
-
   const today = new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   const screenEl = useMemo(() => {
@@ -903,14 +780,9 @@ export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignO
   return (
     <div className="ph-root">
       <style>{CSS}</style>
-
       {mobileOpen && <div className="ph-overlay open" onClick={() => setMobile(false)} />}
-
-      <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen}
-        pharmacistName={pharmacistName} onSignOut={onSignOut} />
-
+      <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen} pharmacistName={pharmacistName} onSignOut={onSignOut} />
       <div className="ph-main">
-        {/* Header — NO logout button here. Single sign-out is in sidebar only. */}
         <div className="ph-header">
           <button className="ph-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
             <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
@@ -923,65 +795,53 @@ export default function PharmacistScreen({ pharmacistName = 'Mei Perez', onSignO
           </div>
           <div className="ph-header-date">{today}</div>
 
-          {/* Clickable profile avatar with hover tooltip */}
+          {/* ── Profile wrap — Patient-style hover card ── */}
           <div className="ph-profile-wrap">
-            <div className="ph-profile-avatar" onClick={() => setShowProfile(true)}>
-              {abb}
-              <div className="ph-profile-tooltip">
-                <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{pharmacistName}</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Lead Pharmacist</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>pharmacy@vexoo.in</div>
-                <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
-              </div>
+            <div className="ph-profile-avatar" onClick={() => setShowProfile(true)}>{abb}</div>
+            <div className="ph-profile-tooltip">
+              <div className="ph-tt-avatar">{abb}</div>
+              <div className="ph-tt-name">{pharmacistName}</div>
+              <div className="ph-tt-sub">Lead Pharmacist</div>
+              <div className="ph-tt-sub">pharmacy@vexoo.in</div>
+              <div className="ph-tt-divider" />
+              <button className="ph-tt-action profile" onClick={() => setShowProfile(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+                View / Edit Profile
+              </button>
+              <button className="ph-tt-action signout" onClick={onSignOut}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Sign out
+              </button>
             </div>
           </div>
         </div>
-
         {screenEl}
       </div>
 
       {/* ── Profile Modal ── */}
       {showProfile && (
-        <div onClick={() => setShowProfile(false)} style={{
-          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          zIndex:200, backdropFilter:'blur(2px)'
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background:'white', borderRadius:16, padding:28,
-            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)',
-            border:'1px solid var(--border)'
-          }}>
+        <div onClick={() => setShowProfile(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, backdropFilter:'blur(2px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'white', borderRadius:16, padding:28, width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)', border:'1px solid var(--border)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
-              <div style={{ width:60, height:60, borderRadius:'50%',
-                background:'linear-gradient(135deg,var(--primary),#0891b2)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
+              <div style={{ width:60, height:60, borderRadius:'50%', background:'linear-gradient(135deg,var(--primary),#0891b2)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
               <div>
                 <div style={{ fontWeight:700, fontSize:17 }}>{pharmacistName}</div>
                 <div style={{ fontSize:13, color:'var(--muted)' }}>Lead Pharmacist · Pharmacy Portal</div>
               </div>
             </div>
-            {[['Full Name', pharmacistName], ['Email', 'pharmacy@vexoo.in'], ['Phone', '+91 98765 43210'], ['Licence No.', 'PH/2020/MH/04182'], ['Role', 'Lead Pharmacist']].map(([label, val]) => (
+            {[['Full Name',pharmacistName],['Email','pharmacy@vexoo.in'],['Phone','+91 98765 43210'],['Licence No.','PH/2020/MH/04182'],['Role','Lead Pharmacist']].map(([label,val]) => (
               <div key={label} style={{ marginBottom:14 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>{label}</div>
-                <input defaultValue={val} style={{
-                  width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
-                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
-                  color:'var(--text)', background:'var(--bg)'
-                }} />
+                <input defaultValue={val} style={{ width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit', color:'var(--text)', background:'var(--bg)' }} />
               </div>
             ))}
             <div style={{ display:'flex', gap:10, marginTop:20 }}>
-              <button onClick={() => setShowProfile(false)} style={{
-                flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)',
-                background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
-              }}>Close</button>
-              <button style={{
-                flex:1, padding:'10px', borderRadius:10, border:'none',
-                background:'var(--primary)', color:'white', cursor:'pointer',
-                fontFamily:'inherit', fontSize:13.5, fontWeight:600
-              }}>Save Changes</button>
+              <button onClick={() => setShowProfile(false)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Close</button>
+              <button style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'var(--primary)', color:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5, fontWeight:600 }}>Save Changes</button>
             </div>
           </div>
         </div>

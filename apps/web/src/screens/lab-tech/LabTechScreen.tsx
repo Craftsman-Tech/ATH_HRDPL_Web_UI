@@ -2,30 +2,17 @@
  * ============================================================================
  *  LabTechScreen.tsx — Lab Technician Portal
  * ============================================================================
- *  Dark navy sidebar, light blue-tinted body portal for lab staff.
- *  Faithfully ported from Vexoo_Lab_Tech.html.
- *
- *  Screens (6):
- *    Test Orders · Sample Tracking · Enter Results
- *    Results Review · Equipment Status · Lab Reports
- *
  *  Route:           /lab  (protected, role === 'LabTech')
  *  Suggested path:  apps/web/src/screens/lab-tech/LabTechScreen.tsx
  *
- *  Props:
- *    techName?   — from AuthContext (e.g. "Kevin Liu")
- *    onSignOut?  — called when Logout is clicked
- *
- *  FIX (Jun 2026):
- *  - Header now shows clickable profile avatar (top-right) with hover tooltip
- *    displaying user details. Click opens an editable profile modal.
- *  - Single Sign out button only in sidebar. No duplicate logout in header.
+ *  UPDATED (Jun 2026):
+ *  - Header profile card now matches the Patient-screen style:
+ *    avatar circle · name · role · email · divider · View/Edit Profile
+ *    (opens modal) · Sign out (calls onSignOut).
  * ============================================================================
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ScreenId    = 'orders' | 'samples' | 'results' | 'review' | 'equipment' | 'reports';
 type Priority    = 'STAT' | 'Urgent' | 'Routine';
@@ -35,7 +22,6 @@ type EqStatus    = 'Online' | 'Warning' | 'Offline';
 type ChipColor   = 'primary' | 'amber' | 'rose' | 'blue' | 'green' | 'purple' | 'gray';
 
 interface NavItem { id: ScreenId; label: string; path: string; badge?: number; }
-
 interface LabOrder {
   id: string; patient: string; pid: string; test: string;
   ordered: string; time: string; priority: Priority; status: OrderStatus;
@@ -56,14 +42,10 @@ interface ReviewResult {
   results: [string, string, string, 'normal' | 'high' | 'low'][];
 }
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-
 interface LabTechScreenProps {
   techName?: string;
   onSignOut?: () => void;
 }
-
-// ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -89,13 +71,9 @@ const CSS = `
   --card:    #fff;
 
   font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
+  background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden; display: flex;
 }
-
 .lt-root ::-webkit-scrollbar       { width: 5px; height: 5px; }
 .lt-root ::-webkit-scrollbar-thumb { background: #cdd4e0; border-radius: 4px; }
 .lt-root ::-webkit-scrollbar-track { background: transparent; }
@@ -107,15 +85,12 @@ const CSS = `
 
 /* ── Sidebar ── */
 .lt-sidebar {
-  width: 226px; flex-shrink: 0;
-  background: var(--sidebar);
-  display: flex; flex-direction: column;
-  height: 100vh; overflow-y: auto;
+  width: 226px; flex-shrink: 0; background: var(--sidebar);
+  display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
   transition: transform 0.25s cubic-bezier(.4,0,.2,1);
 }
 .lt-logo-row {
-  padding: 18px 20px;
-  display: flex; align-items: center; gap: 10px;
+  padding: 18px 20px; display: flex; align-items: center; gap: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 .lt-logo-icon {
@@ -123,8 +98,7 @@ const CSS = `
   border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .lt-sidebar-stats {
-  padding: 12px 14px 8px;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  padding: 12px 14px 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
 }
 .lt-stat-pill { background: rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 12px; text-align: center; }
 .lt-nav { flex: 1; padding: 8px 10px; }
@@ -132,8 +106,7 @@ const CSS = `
   display: flex; align-items: center; gap: 11px;
   width: 100%; padding: 10px 13px; border-radius: 10px;
   border: none; cursor: pointer; margin-bottom: 2px;
-  font-size: 13.5px; font-family: 'Plus Jakarta Sans', sans-serif;
-  transition: all 0.13s;
+  font-size: 13.5px; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.13s;
 }
 .lt-nav-btn.active   { background: var(--primary); color: white; font-weight: 600; }
 .lt-nav-btn.inactive { background: transparent; color: rgba(255,255,255,0.55); font-weight: 400; }
@@ -161,10 +134,50 @@ const CSS = `
   font-family: inherit; cursor: pointer; width: 100%;
   transition: background 0.13s, color 0.13s, border-color 0.13s;
 }
-.lt-logout-btn:hover {
-  background: rgba(225,29,72,0.12); color: #f87171;
-  border-color: rgba(225,29,72,0.25);
+.lt-logout-btn:hover { background: rgba(225,29,72,0.12); color: #f87171; border-color: rgba(225,29,72,0.25); }
+
+/* ── Profile wrap — Patient-style card ── */
+.lt-profile-wrap { position: relative; }
+.lt-profile-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px;
+  cursor: pointer; flex-shrink: 0; transition: box-shadow 0.15s;
 }
+.lt-profile-wrap:hover .lt-profile-avatar { box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+.lt-profile-tooltip {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; min-width: 230px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+  z-index: 1000;
+}
+.lt-profile-wrap:hover .lt-profile-tooltip { display: block; }
+.lt-profile-tooltip::before {
+  content: ''; position: absolute;
+  top: -12px; left: 0; right: 0; height: 12px;
+}
+.lt-tt-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 16px; margin-bottom: 12px;
+}
+.lt-tt-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.lt-tt-sub  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.lt-tt-divider { height: 1px; background: var(--border); margin: 12px 0; }
+.lt-tt-action {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 10px; border-radius: 9px; border: none; background: transparent;
+  font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.13s;
+}
+.lt-tt-action svg { flex-shrink: 0; }
+.lt-tt-action.profile { color: var(--primary); }
+.lt-tt-action.profile:hover { background: var(--pl); }
+.lt-tt-action.signout { color: var(--rose); }
+.lt-tt-action.signout:hover { background: var(--rl); }
 
 /* mobile overlay */
 .lt-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9; }
@@ -180,6 +193,7 @@ const CSS = `
   display: flex; align-items: center; padding: 0 24px; height: 60px;
   background: var(--card); border-bottom: 1px solid var(--border);
   gap: 14px; flex-shrink: 0;
+  position: relative; z-index: 15;
 }
 .lt-header-title  { font-weight: 700; font-size: 17px; }
 .lt-header-spacer { flex: 1; }
@@ -189,28 +203,6 @@ const CSS = `
   border-radius: 9px; border: 1px solid #fca5a5;
 }
 .lt-stat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); }
-
-/* ── Profile avatar + tooltip ── */
-.lt-profile-wrap { position: relative; }
-.lt-profile-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--purple));
-  display: flex; align-items: center; justify-content: center;
-  color: white; font-weight: 700; font-size: 13px;
-  cursor: pointer; flex-shrink: 0; transition: opacity 0.15s;
-}
-.lt-profile-avatar:hover { opacity: 0.85; }
-.lt-profile-tooltip {
-  position: absolute; top: calc(100% + 10px); right: 0;
-  background: white; border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  min-width: 200px; z-index: 100; pointer-events: none;
-  opacity: 0; transform: translateY(-4px);
-  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
-}
-.lt-profile-wrap:hover .lt-profile-tooltip { opacity: 1; transform: translateY(0); }
-
 .lt-scroll { flex: 1; overflow-y: auto; }
 
 /* ── Card ── */
@@ -245,8 +237,7 @@ const CSS = `
 .lt-order-stat    { border-radius: 12px; padding: 12px 14px; text-align: center; border: 1px solid transparent; }
 .lt-order-row {
   border-radius: 13px; padding: 14px 18px; cursor: pointer; transition: all 0.15s;
-  display: flex; align-items: center; gap: 14px; margin-bottom: 8px;
-  border-style: solid;
+  display: flex; align-items: center; gap: 14px; margin-bottom: 8px; border-style: solid;
 }
 .lt-order-row.selected { background: var(--pl); border-width: 1.5px; border-color: var(--primary); }
 .lt-order-row.normal   { background: var(--card); border-width: 1px; border-color: var(--border); }
@@ -255,10 +246,7 @@ const CSS = `
 .lt-detail-section { background: var(--bg); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); }
 .lt-detail-label  { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
 .lt-detail-row    { display: flex; justify-content: space-between; margin-bottom: 7px; gap: 12px; }
-.lt-step-dot {
-  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-}
+.lt-step-dot { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .lt-action-btn {
   background: var(--primary); color: white; border: none; border-radius: 12px;
   padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer;
@@ -270,12 +258,9 @@ const CSS = `
   padding: 13px; text-align: center; color: var(--green); font-weight: 700; font-size: 14px;
 }
 
-/* ── Results entry ── */
+/* ── Results ── */
 .lt-results-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
-.lt-order-pick {
-  padding: 12px 14px; border-radius: 11px; cursor: pointer; transition: all 0.13s;
-  margin-bottom: 8px;
-}
+.lt-order-pick { padding: 12px 14px; border-radius: 11px; cursor: pointer; transition: all 0.13s; margin-bottom: 8px; }
 .lt-order-pick.active  { background: var(--pl); border: 1.5px solid var(--primary); }
 .lt-order-pick.inactive{ background: var(--card); border: 1px solid var(--border); }
 .lt-result-field { background: var(--bg); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); }
@@ -292,28 +277,13 @@ const CSS = `
   color: var(--text); transition: border-color 0.15s;
 }
 .lt-notes-textarea:focus { border-color: var(--primary); }
-.lt-submit-btn {
-  background: var(--primary); color: white; border: none; border-radius: 10px;
-  padding: 11px 24px; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit;
-}
-.lt-ghost-btn {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
-  padding: 11px 20px; font-size: 13.5px; cursor: pointer; color: var(--muted); font-family: inherit;
-}
-.lt-flag-btn {
-  background: var(--rl); color: var(--rose); border: 1px solid var(--rose);
-  border-radius: 10px; padding: 11px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit;
-}
+.lt-submit-btn { background: var(--primary); color: white; border: none; border-radius: 10px; padding: 11px 24px; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.lt-ghost-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 11px 20px; font-size: 13.5px; cursor: pointer; color: var(--muted); font-family: inherit; }
+.lt-flag-btn { background: var(--rl); color: var(--rose); border: 1px solid var(--rose); border-radius: 10px; padding: 11px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
 
 /* ── Review ── */
-.lt-review-card-header {
-  padding: 16px 20px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.lt-print-btn {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-  padding: 5px 14px; font-size: 12.5px; cursor: pointer; color: var(--muted); font-family: inherit;
-}
+.lt-review-card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.lt-print-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 5px 14px; font-size: 12.5px; cursor: pointer; color: var(--muted); font-family: inherit; }
 .lt-result-th { padding: 7px 12px; text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
 .lt-result-td { padding: 9px 12px; font-size: 13.5px; }
 
@@ -334,10 +304,7 @@ const CSS = `
 
 /* ── Responsive ── */
 @media (max-width: 1080px) {
-  .lt-sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 20;
-    transform: translateX(-100%);
-  }
+  .lt-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 20; transform: translateX(-100%); }
   .lt-sidebar.mobile-open { transform: translateX(0); }
   .lt-hamburger { display: flex !important; }
   .lt-orders-layout  { grid-template-columns: 1fr; }
@@ -395,12 +362,12 @@ const REVIEW_RESULTS: ReviewResult[] = [
 ];
 
 const EQUIPMENT: Equipment[] = [
-  { id:'ANA-001', name:'Hematology Analyzer',  model:'Sysmex XN-1000',        status:'Online',   load:'72%', lastCalib:'Apr 24, 2026', nextCalib:'May 8, 2026',  tests:['CBC','Reticulocytes'],             uptime:'99.2%' },
-  { id:'ANA-002', name:'Chemistry Analyzer',   model:'Roche Cobas 8000',       status:'Online',   load:'45%', lastCalib:'Apr 22, 2026', nextCalib:'May 6, 2026',  tests:['Metabolic Panel','LFTs','Lipids'],  uptime:'98.8%' },
-  { id:'ANA-003', name:'Immunoassay Analyzer', model:'Abbott Architect',        status:'Warning',  load:'88%', lastCalib:'Apr 20, 2026', nextCalib:'May 4, 2026',  tests:['Troponin','HbA1c','TSH'],           uptime:'96.1%' },
-  { id:'IMG-001', name:'MRI Scanner',          model:'Siemens MAGNETOM',        status:'Online',   load:'30%', lastCalib:'Apr 15, 2026', nextCalib:'May 15, 2026', tests:['MRI Brain','MRI Spine','MRI Body'], uptime:'99.7%' },
-  { id:'PFT-001', name:'Spirometer',           model:'ndd EasyOne Air',         status:'Online',   load:'20%', lastCalib:'Apr 25, 2026', nextCalib:'May 9, 2026',  tests:['Spirometry','PFT'],                 uptime:'100%'  },
-  { id:'ECG-001', name:'ECG Machine',          model:'Philips PageWriter TC70', status:'Offline',  load:'0%',  lastCalib:'Apr 10, 2026', nextCalib:'—',            tests:['ECG','Holter'],                     uptime:'85.0%' },
+  { id:'ANA-001', name:'Hematology Analyzer',  model:'Sysmex XN-1000',        status:'Online',  load:'72%', lastCalib:'Apr 24, 2026', nextCalib:'May 8, 2026',  tests:['CBC','Reticulocytes'],             uptime:'99.2%' },
+  { id:'ANA-002', name:'Chemistry Analyzer',   model:'Roche Cobas 8000',       status:'Online',  load:'45%', lastCalib:'Apr 22, 2026', nextCalib:'May 6, 2026',  tests:['Metabolic Panel','LFTs','Lipids'],  uptime:'98.8%' },
+  { id:'ANA-003', name:'Immunoassay Analyzer', model:'Abbott Architect',        status:'Warning', load:'88%', lastCalib:'Apr 20, 2026', nextCalib:'May 4, 2026',  tests:['Troponin','HbA1c','TSH'],           uptime:'96.1%' },
+  { id:'IMG-001', name:'MRI Scanner',          model:'Siemens MAGNETOM',        status:'Online',  load:'30%', lastCalib:'Apr 15, 2026', nextCalib:'May 15, 2026', tests:['MRI Brain','MRI Spine','MRI Body'], uptime:'99.7%' },
+  { id:'PFT-001', name:'Spirometer',           model:'ndd EasyOne Air',         status:'Online',  load:'20%', lastCalib:'Apr 25, 2026', nextCalib:'May 9, 2026',  tests:['Spirometry','PFT'],                 uptime:'100%'  },
+  { id:'ECG-001', name:'ECG Machine',          model:'Philips PageWriter TC70', status:'Offline', load:'0%',  lastCalib:'Apr 10, 2026', nextCalib:'—',            tests:['ECG','Holter'],                     uptime:'85.0%' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -420,13 +387,11 @@ function statusColor(s: string): ChipColor {
   if (s === 'Scheduled')  return 'purple';
   return 'gray';
 }
-
 function eqBorderColor(s: EqStatus) {
   if (s === 'Online')  return 'var(--green)';
   if (s === 'Warning') return 'var(--amber)';
   return 'var(--rose)';
 }
-
 function priorityLeftBorder(p: Priority) {
   if (p === 'STAT')   return 'var(--rose)';
   if (p === 'Urgent') return 'var(--amber)';
@@ -436,16 +401,9 @@ function priorityLeftBorder(p: Priority) {
 function Chip({ label, color = 'primary' }: { label: string; color?: ChipColor }) {
   return <span className={`lt-chip lt-chip-${color}`}>{label}</span>;
 }
-
 function SvgIcon({ path, size = 17, color = 'currentColor' }: { path: string; size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ flexShrink: 0 }}>
-      <path d={path} />
-    </svg>
-  );
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ flexShrink: 0 }}><path d={path} /></svg>;
 }
-
-// ─── Nav config ───────────────────────────────────────────────────────────────
 
 const NAV: NavItem[] = [
   { id:'orders',    label:'Test Orders',      badge:2, path:'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z' },
@@ -460,19 +418,16 @@ const SCREEN_TITLES: Record<ScreenId, string> = {
   orders:'Test Orders', samples:'Sample Tracking', results:'Enter Results',
   review:'Results Review', equipment:'Equipment Status', reports:'Lab Reports',
 };
-
 const PROCESSING_STEPS = ['Sample Received & Logged','Sample Centrifuged','Analysis Running','Results Verified','Report Released'];
 
 // ─── Screen: Orders ───────────────────────────────────────────────────────────
 
 const OrdersScreen: React.FC = () => {
   const [sel, setSel] = useState<LabOrder>(ORDERS[1]);
-
   const sorted = useMemo(() => [...ORDERS].sort((a, b) => {
     const p: Record<Priority, number> = { STAT:0, Urgent:1, Routine:2 };
     return p[a.priority] - p[b.priority];
   }), []);
-
   return (
     <div className="lt-orders-layout lt-fade">
       <div className="lt-orders-list">
@@ -480,64 +435,51 @@ const OrdersScreen: React.FC = () => {
           {([['STAT',   ORDERS.filter(o=>o.priority==='STAT').length,   'var(--rose)',    'var(--rl)'],
              ['Urgent', ORDERS.filter(o=>o.priority==='Urgent').length,  'var(--amber)',   'var(--al)'],
              ['Processing',ORDERS.filter(o=>o.status==='Processing').length,'var(--primary)','var(--pl)'],
-             ['Complete',  ORDERS.filter(o=>o.status==='Complete').length,  'var(--green)', 'var(--gl)']] as [string,number,string,string][]).map(([l, n, c, bg]) => (
+             ['Complete',  ORDERS.filter(o=>o.status==='Complete').length,  'var(--green)', 'var(--gl)']] as [string,number,string,string][]).map(([l,n,c,bg]) => (
             <div key={l} className="lt-order-stat" style={{ background:bg }}>
               <div style={{ fontSize:24, fontWeight:800, color:c }}>{n}</div>
               <div style={{ fontSize:12, color:c, marginTop:2, fontWeight:500 }}>{l}</div>
             </div>
           ))}
         </div>
-
-        <div style={{ display:'flex', flexDirection:'column' }}>
-          {sorted.map(o => (
-            <div key={o.id} className={`lt-order-row ${sel.id === o.id ? 'selected' : 'normal'}`}
-              style={{ borderLeftWidth:4, borderLeftStyle:'solid', borderLeftColor: priorityLeftBorder(o.priority) }}
-              onClick={() => setSel(o)}>
-              <div style={{ flex:1 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                  <span style={{ fontWeight:700, fontSize:14 }}>{o.patient}</span>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <Chip label={o.priority} color={statusColor(o.priority)} />
-                    <Chip label={o.status}   color={statusColor(o.status)}   />
-                  </div>
-                </div>
-                <div style={{ fontSize:13, fontWeight:600, marginBottom:3 }}>{o.test}</div>
-                <div style={{ fontSize:12, color:'var(--muted)' }}>{o.id} · {o.type} · Ordered by {o.ordered} · {o.time}</div>
+        {sorted.map(o => (
+          <div key={o.id} className={`lt-order-row ${sel.id === o.id ? 'selected' : 'normal'}`}
+            style={{ borderLeftWidth:4, borderLeftStyle:'solid', borderLeftColor: priorityLeftBorder(o.priority) }}
+            onClick={() => setSel(o)}>
+            <div style={{ flex:1 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                <span style={{ fontWeight:700, fontSize:14 }}>{o.patient}</span>
+                <div style={{ display:'flex', gap:6 }}><Chip label={o.priority} color={statusColor(o.priority)} /><Chip label={o.status} color={statusColor(o.status)} /></div>
               </div>
+              <div style={{ fontSize:13, fontWeight:600, marginBottom:3 }}>{o.test}</div>
+              <div style={{ fontSize:12, color:'var(--muted)' }}>{o.id} · {o.type} · Ordered by {o.ordered} · {o.time}</div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-
       <div className="lt-orders-detail">
         <div className="lt-detail-header"
           style={{ background: sel.priority === 'STAT' ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e2a4a,#2a3a6a)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-            {sel.priority === 'STAT' && (
-              <span style={{ background:'rgba(255,255,255,0.2)', padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🚨 STAT</span>
-            )}
+            {sel.priority === 'STAT' && <span style={{ background:'rgba(255,255,255,0.2)', padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🚨 STAT</span>}
             <span style={{ fontSize:12, opacity:0.6 }}>{sel.id}</span>
           </div>
           <div style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{sel.test}</div>
           <div style={{ opacity:0.75, fontSize:13 }}>{sel.patient} · {sel.type} · Ordered {sel.time}</div>
         </div>
-
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
           <div className="lt-detail-section">
             <div className="lt-detail-label">Order Details</div>
-            {([['Patient', sel.patient],['Patient ID', sel.pid],['Test', sel.test],
-               ['Sample Type', sel.type],['Ordered By', sel.ordered],['Order Time', sel.time],
-               ['Priority', sel.priority],['Sample Collected', sel.collected],
-               ['Barcode', sel.barcode]] as [string, string][]).map(([k, v]) => (
+            {([['Patient',sel.patient],['Patient ID',sel.pid],['Test',sel.test],
+               ['Sample Type',sel.type],['Ordered By',sel.ordered],['Order Time',sel.time],
+               ['Priority',sel.priority],['Sample Collected',sel.collected],
+               ['Barcode',sel.barcode]] as [string,string][]).map(([k,v]) => (
               <div key={k} className="lt-detail-row">
                 <span style={{ fontSize:12, color:'var(--muted)', flexShrink:0 }}>{k}</span>
-                <span style={{ fontSize:12.5, fontWeight:500, textAlign:'right',
-                  color: k === 'Priority' && sel.priority === 'STAT' ? 'var(--rose)' : 'var(--text)',
-                  fontFamily: k === 'Barcode' ? 'monospace' : 'inherit' }}>{v}</span>
+                <span style={{ fontSize:12.5, fontWeight:500, textAlign:'right', color: k==='Priority'&&sel.priority==='STAT'?'var(--rose)':'var(--text)', fontFamily: k==='Barcode'?'monospace':'inherit' }}>{v}</span>
               </div>
             ))}
           </div>
-
           <div>
             <div className="lt-detail-label">Processing Steps</div>
             {PROCESSING_STEPS.map((step, i) => {
@@ -545,28 +487,19 @@ const OrdersScreen: React.FC = () => {
               const active = sel.status === 'Processing' && i === 2;
               return (
                 <div key={step} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
-                  <div className="lt-step-dot" style={{
-                    background: done ? 'var(--green)' : active ? 'var(--primary)' : 'var(--bg)',
-                    border: done ? 'none' : active ? '2px solid var(--primary)' : '2px solid var(--border)',
-                  }}>
-                    {done
-                      ? <SvgIcon path="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" size={12} color="white" />
-                      : <div style={{ width:8, height:8, borderRadius:'50%', background: active ? 'var(--primary)' : 'var(--border)' }} />}
+                  <div className="lt-step-dot" style={{ background: done?'var(--green)':active?'var(--primary)':'var(--bg)', border: done?'none':active?'2px solid var(--primary)':'2px solid var(--border)' }}>
+                    {done ? <SvgIcon path="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" size={12} color="white" />
+                          : <div style={{ width:8, height:8, borderRadius:'50%', background: active?'var(--primary)':'var(--border)' }} />}
                   </div>
-                  <span style={{ fontSize:13, fontWeight: done ? 500 : 400, color: done ? 'var(--text)' : active ? 'var(--primary)' : 'var(--muted)', flex:1 }}>{step}</span>
+                  <span style={{ fontSize:13, fontWeight:done?500:400, color:done?'var(--text)':active?'var(--primary)':'var(--muted)', flex:1 }}>{step}</span>
                   {active && <span style={{ fontSize:11, color:'var(--primary)', fontWeight:600 }}>In progress...</span>}
                 </div>
               );
             })}
           </div>
-
-          {sel.status !== 'Complete' ? (
-            <button className="lt-action-btn">
-              {sel.status === 'Pending' ? 'Collect Sample' : 'Mark Step Complete'}
-            </button>
-          ) : (
-            <div className="lt-complete-banner">✓ Results Released to Doctor</div>
-          )}
+          {sel.status !== 'Complete'
+            ? <button className="lt-action-btn">{sel.status === 'Pending' ? 'Collect Sample' : 'Mark Step Complete'}</button>
+            : <div className="lt-complete-banner">✓ Results Released to Doctor</div>}
         </div>
       </div>
     </div>
@@ -581,9 +514,7 @@ const SamplesScreen: React.FC = () => (
       <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', fontWeight:700, fontSize:15 }}>Sample Tracking Board</div>
       <div style={{ overflowX:'auto' }}>
         <table className="lt-table">
-          <thead>
-            <tr>{['Barcode','Patient','Test','Collected','Location','Status','ETA',''].map(h => <th key={h} className="lt-th">{h}</th>)}</tr>
-          </thead>
+          <thead><tr>{['Barcode','Patient','Test','Collected','Location','Status','ETA',''].map(h => <th key={h} className="lt-th">{h}</th>)}</tr></thead>
           <tbody>
             {SAMPLES.map(s => (
               <tr key={s.barcode} className="lt-tr">
@@ -593,10 +524,8 @@ const SamplesScreen: React.FC = () => (
                 <td className="lt-td" style={{ color:'var(--muted)' }}>{s.collected}</td>
                 <td className="lt-td">{s.location}</td>
                 <td className="lt-td"><Chip label={s.status} color={statusColor(s.status)} /></td>
-                <td className="lt-td" style={{ color:'var(--muted)', fontWeight: s.status === 'Processing' ? 600 : 400 }}>{s.eta}</td>
-                <td className="lt-td">
-                  <button style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', fontSize:12, cursor:'pointer', color:'var(--muted)', fontFamily:'inherit' }}>Track</button>
-                </td>
+                <td className="lt-td" style={{ color:'var(--muted)', fontWeight: s.status==='Processing'?600:400 }}>{s.eta}</td>
+                <td className="lt-td"><button style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'5px 12px', fontSize:12, cursor:'pointer', color:'var(--muted)', fontFamily:'inherit' }}>Track</button></td>
               </tr>
             ))}
           </tbody>
@@ -612,7 +541,6 @@ const ResultsScreen: React.FC = () => {
   const activeOrders = ORDERS.filter(o => o.status !== 'Complete');
   const [selOrder, setSelOrder] = useState<LabOrder>(activeOrders[0]);
   const fields = RESULT_FIELDS[selOrder.test] ?? [];
-
   return (
     <div className="lt-scroll lt-fade" style={{ padding:20 }}>
       <div className="lt-results-layout">
@@ -626,7 +554,6 @@ const ResultsScreen: React.FC = () => {
             </div>
           ))}
         </div>
-
         <div className="lt-card">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
             <div>
@@ -635,7 +562,6 @@ const ResultsScreen: React.FC = () => {
             </div>
             <Chip label={selOrder.priority} color={statusColor(selOrder.priority)} />
           </div>
-
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:20 }}>
             {fields.map(([name, unit, ref]) => (
               <div key={name} className="lt-result-field">
@@ -650,18 +576,14 @@ const ResultsScreen: React.FC = () => {
               </div>
             ))}
           </div>
-
           <div style={{ marginBottom:16 }}>
             <div style={{ fontSize:12.5, fontWeight:600, color:'var(--muted)', marginBottom:6 }}>Interpretation / Notes</div>
             <textarea className="lt-notes-textarea" placeholder="Add interpretation or notes for the physician..." />
           </div>
-
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             <button className="lt-submit-btn">Submit & Release Results</button>
             <button className="lt-ghost-btn">Save Draft</button>
-            {selOrder.priority === 'STAT' && (
-              <button className="lt-flag-btn">🚨 Flag Critical</button>
-            )}
+            {selOrder.priority === 'STAT' && <button className="lt-flag-btn">🚨 Flag Critical</button>}
           </div>
         </div>
       </div>
@@ -675,29 +597,27 @@ const ReviewScreen: React.FC = () => (
   <div className="lt-scroll lt-fade" style={{ padding:20, display:'flex', flexDirection:'column', gap:12 }}>
     {REVIEW_RESULTS.map((r, i) => (
       <div key={i} className="lt-card" style={{ padding:0, overflow:'hidden' }}>
-        <div className="lt-review-card-header" style={{ background: r.status === 'Abnormal' ? '#fff8f8' : 'var(--card)' }}>
+        <div className="lt-review-card-header" style={{ background: r.status==='Abnormal'?'#fff8f8':'var(--card)' }}>
           <div>
             <div style={{ fontWeight:700, fontSize:15 }}>{r.test}</div>
             <div style={{ fontSize:12.5, color:'var(--muted)', marginTop:2 }}>{r.patient} · {r.id} · {r.date} · Ordered by {r.doctor}</div>
           </div>
           <div style={{ display:'flex', gap:8 }}>
-            <Chip label={r.status} color={r.status === 'Normal' ? 'green' : 'rose'} />
+            <Chip label={r.status} color={r.status==='Normal'?'green':'rose'} />
             <button className="lt-print-btn">Print Report</button>
           </div>
         </div>
         <div style={{ padding:'14px 20px' }}>
           <table className="lt-table">
-            <thead>
-              <tr>{['Parameter','Result','Reference Range','Flag'].map(h => <th key={h} className="lt-result-th">{h}</th>)}</tr>
-            </thead>
+            <thead><tr>{['Parameter','Result','Reference Range','Flag'].map(h => <th key={h} className="lt-result-th">{h}</th>)}</tr></thead>
             <tbody>
-              {r.results.map(([name, val, ref, st]) => (
-                <tr key={name} style={{ background: st !== 'normal' ? '#fff8f8' : 'transparent' }}>
+              {r.results.map(([name,val,ref,st]) => (
+                <tr key={name} style={{ background: st!=='normal'?'#fff8f8':'transparent' }}>
                   <td className="lt-result-td" style={{ fontWeight:500 }}>{name}</td>
-                  <td className="lt-result-td" style={{ fontWeight:800, color: st === 'low' ? 'var(--rose)' : st === 'high' ? 'var(--amber)' : 'var(--green)' }}>{val}</td>
+                  <td className="lt-result-td" style={{ fontWeight:800, color: st==='low'?'var(--rose)':st==='high'?'var(--amber)':'var(--green)' }}>{val}</td>
                   <td className="lt-result-td" style={{ fontSize:12.5, color:'var(--muted)' }}>{ref}</td>
                   <td className="lt-result-td">
-                    {st !== 'normal'
+                    {st!=='normal'
                       ? <span style={{ background:'var(--rl)', color:'var(--rose)', fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20 }}>▼ {st.toUpperCase()}</span>
                       : <span style={{ background:'var(--gl)', color:'var(--green)', fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20 }}>✓ NORMAL</span>}
                   </td>
@@ -714,24 +634,19 @@ const ReviewScreen: React.FC = () => (
 // ─── Screen: Equipment ────────────────────────────────────────────────────────
 
 const EquipmentScreen: React.FC = () => {
-  const online  = EQUIPMENT.filter(e => e.status === 'Online').length;
-  const warning = EQUIPMENT.filter(e => e.status === 'Warning').length;
-  const offline = EQUIPMENT.filter(e => e.status === 'Offline').length;
-
+  const online  = EQUIPMENT.filter(e => e.status==='Online').length;
+  const warning = EQUIPMENT.filter(e => e.status==='Warning').length;
+  const offline = EQUIPMENT.filter(e => e.status==='Offline').length;
   return (
     <div className="lt-scroll lt-fade" style={{ padding:20 }}>
       <div className="lt-eq-stats">
-        {([['Online', online,          'var(--green)',   'var(--gl)'],
-           ['Warning', warning,        'var(--amber)',   'var(--al)'],
-           ['Offline', offline,        'var(--rose)',    'var(--rl)'],
-           ['Total',   EQUIPMENT.length,'var(--primary)', 'var(--pl)']] as [string,number,string,string][]).map(([l, n, c, bg]) => (
+        {([['Online',online,'var(--green)','var(--gl)'],['Warning',warning,'var(--amber)','var(--al)'],['Offline',offline,'var(--rose)','var(--rl)'],['Total',EQUIPMENT.length,'var(--primary)','var(--pl)']] as [string,number,string,string][]).map(([l,n,c,bg]) => (
           <div key={l} className="lt-card" style={{ padding:'14px 16px', background:bg }}>
             <div style={{ fontSize:24, fontWeight:800, color:c }}>{n}</div>
             <div style={{ fontSize:12, color:c, marginTop:2, fontWeight:500 }}>{l}</div>
           </div>
         ))}
       </div>
-
       <div className="lt-eq-grid">
         {EQUIPMENT.map(e => (
           <div key={e.id} className="lt-card lt-eq-card" style={{ borderLeftColor: eqBorderColor(e.status) }}>
@@ -743,19 +658,17 @@ const EquipmentScreen: React.FC = () => {
               <Chip label={e.status} color={statusColor(e.status)} />
             </div>
             <div className="lt-eq-meta-grid">
-              {([['Current Load', e.load],['Uptime', e.uptime],['Last Calibrated', e.lastCalib],['Next Due', e.nextCalib]] as [string,string][]).map(([k, v]) => (
+              {([['Current Load',e.load],['Uptime',e.uptime],['Last Calibrated',e.lastCalib],['Next Due',e.nextCalib]] as [string,string][]).map(([k,v]) => (
                 <div key={k} className="lt-eq-meta-box">
                   <div style={{ fontSize:10.5, color:'var(--muted)', marginBottom:2 }}>{k}</div>
-                  <div style={{ fontSize:13, fontWeight:700, color: k === 'Current Load' && parseInt(e.load) > 80 ? 'var(--amber)' : 'var(--text)' }}>{v}</div>
+                  <div style={{ fontSize:13, fontWeight:700, color: k==='Current Load'&&parseInt(e.load)>80?'var(--amber)':'var(--text)' }}>{v}</div>
                 </div>
               ))}
             </div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {e.tests.map(t => <Chip key={t} label={t} color="gray" />)}
-            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>{e.tests.map(t => <Chip key={t} label={t} color="gray" />)}</div>
             {e.status !== 'Online' && (
-              <div style={{ marginTop:10, padding:'8px 12px', background: e.status === 'Warning' ? 'var(--al)' : 'var(--rl)', borderRadius:9, fontSize:12.5, color: e.status === 'Warning' ? 'var(--amber)' : 'var(--rose)', fontWeight:600 }}>
-                {e.status === 'Warning' ? '⚠ High load — schedule maintenance' : '🔴 Offline — contact biomedical engineering'}
+              <div style={{ marginTop:10, padding:'8px 12px', background: e.status==='Warning'?'var(--al)':'var(--rl)', borderRadius:9, fontSize:12.5, color: e.status==='Warning'?'var(--amber)':'var(--rose)', fontWeight:600 }}>
+                {e.status==='Warning' ? '⚠ High load — schedule maintenance' : '🔴 Offline — contact biomedical engineering'}
               </div>
             )}
           </div>
@@ -768,7 +681,7 @@ const EquipmentScreen: React.FC = () => {
 // ─── Screen: Reports ──────────────────────────────────────────────────────────
 
 const MONTHS   = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
-const VOL_DATA = [320, 380, 350, 290, 420, 460, 430];
+const VOL_DATA = [320,380,350,290,420,460,430];
 const MAX_VOL  = Math.max(...VOL_DATA);
 
 const ReportsScreen: React.FC = () => (
@@ -777,10 +690,10 @@ const ReportsScreen: React.FC = () => (
       <div className="lt-card">
         <div style={{ fontWeight:700, fontSize:15, marginBottom:16 }}>Monthly Test Volume</div>
         <div className="lt-bar-chart">
-          {VOL_DATA.map((v, i) => (
+          {VOL_DATA.map((v,i) => (
             <div key={i} className="lt-bar-col">
-              {i === 6 && <div style={{ fontSize:10, color:'var(--primary)', fontWeight:700 }}>{v}</div>}
-              <div className="lt-bar-block" style={{ height:`${(v / MAX_VOL) * 90}px`, background:'var(--primary)', opacity: i === 6 ? 1 : 0.3 }} />
+              {i===6 && <div style={{ fontSize:10, color:'var(--primary)', fontWeight:700 }}>{v}</div>}
+              <div className="lt-bar-block" style={{ height:`${(v/MAX_VOL)*90}px`, background:'var(--primary)', opacity: i===6?1:0.3 }} />
               <span style={{ fontSize:10.5, color:'var(--muted)' }}>{MONTHS[i]}</span>
             </div>
           ))}
@@ -788,7 +701,7 @@ const ReportsScreen: React.FC = () => (
       </div>
       <div className="lt-card">
         <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>Test Type Distribution</div>
-        {([['Blood Tests','58%','var(--primary)',58],['Imaging','22%','var(--purple)',22],['Pulmonary','12%','var(--teal)',12],['Cardiac','8%','var(--rose)',8]] as [string,string,string,number][]).map(([t, p, c, w]) => (
+        {([['Blood Tests','58%','var(--primary)',58],['Imaging','22%','var(--purple)',22],['Pulmonary','12%','var(--teal)',12],['Cardiac','8%','var(--rose)',8]] as [string,string,string,number][]).map(([t,p,c,w]) => (
           <div key={t} style={{ marginBottom:12 }}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
               <span style={{ fontSize:13, fontWeight:500 }}>{t}</span>
@@ -801,7 +714,6 @@ const ReportsScreen: React.FC = () => (
         ))}
       </div>
     </div>
-
     <div className="lt-reports-bot">
       <div className="lt-card">
         <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>Turnaround Times</div>
@@ -809,7 +721,7 @@ const ReportsScreen: React.FC = () => (
            ['Metabolic Panel','52 min','Target: 60 min','✓ On Track','var(--green)'],
            ['Troponin (STAT)','18 min','Target: 30 min','↑ Excellent','var(--primary)'],
            ['HbA1c','2.1 hrs','Target: 4 hrs','✓ On Track','var(--green)'],
-           ['MRI Brain','4.5 hrs','Target: 6 hrs','✓ On Track','var(--green)']] as [string,string,string,string,string][]).map(([test, time, target, status, c]) => (
+           ['MRI Brain','4.5 hrs','Target: 6 hrs','✓ On Track','var(--green)']] as [string,string,string,string,string][]).map(([test,time,target,status,c]) => (
           <div key={test} className="lt-kpi-row">
             <div>
               <div style={{ fontSize:13, fontWeight:500 }}>{test}</div>
@@ -828,7 +740,7 @@ const ReportsScreen: React.FC = () => (
            ['Critical Value Reporting','100%','> 98%','var(--green)'],
            ['Result Accuracy','99.3%','> 99%','var(--green)'],
            ['STAT Compliance','94%','> 90%','var(--green)'],
-           ['Equipment Uptime','96.8%','> 95%','var(--green)']] as [string,string,string,string][]).map(([metric, val, target, c]) => (
+           ['Equipment Uptime','96.8%','> 95%','var(--green)']] as [string,string,string,string][]).map(([metric,val,target,c]) => (
           <div key={metric} className="lt-kpi-row">
             <div>
               <div style={{ fontSize:13, fontWeight:500 }}>{metric}</div>
@@ -862,16 +774,14 @@ const Sidebar: React.FC<{
           <div style={{ color:'rgba(255,255,255,0.4)', fontSize:10.5 }}>Lab Portal</div>
         </div>
       </div>
-
       <div className="lt-sidebar-stats">
-        {([['STAT','1','var(--rose)'],['Pending','2','var(--amber)']] as [string,string,string][]).map(([l, v, c]) => (
+        {([['STAT','1','var(--rose)'],['Pending','2','var(--amber)']] as [string,string,string][]).map(([l,v,c]) => (
           <div key={l} className="lt-stat-pill">
             <div style={{ fontSize:20, fontWeight:800, color:c }}>{v}</div>
             <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.45)', marginTop:1 }}>{l}</div>
           </div>
         ))}
       </div>
-
       <nav className="lt-nav">
         {NAV.map(item => {
           const on = active === item.id;
@@ -884,8 +794,6 @@ const Sidebar: React.FC<{
           );
         })}
       </nav>
-
-      {/* Sidebar footer: user identity (read-only) + single sign out button */}
       <div className="lt-sidebar-footer">
         <div className="lt-user-identity">
           <div className="lt-user-avatar">{abb}</div>
@@ -896,9 +804,7 @@ const Sidebar: React.FC<{
         </div>
         <button className="lt-logout-btn" onClick={onSignOut}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
           Sign out
         </button>
@@ -913,7 +819,6 @@ export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: Lab
   const [screen, setScreen]     = useState<ScreenId>('orders');
   const [mobileOpen, setMobile] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-
   const abb = initials(techName);
 
   useEffect(() => {
@@ -923,7 +828,6 @@ export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: Lab
   }, []);
 
   const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); }, []);
-
   const today = new Date().toLocaleDateString('en-IN', { year:'numeric', month:'short', day:'numeric' });
 
   const screenEl = useMemo(() => {
@@ -940,14 +844,9 @@ export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: Lab
   return (
     <div className="lt-root">
       <style>{CSS}</style>
-
       {mobileOpen && <div className="lt-overlay open" onClick={() => setMobile(false)} />}
-
-      <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen}
-        techName={techName} onSignOut={onSignOut} />
-
+      <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen} techName={techName} onSignOut={onSignOut} />
       <div className="lt-main">
-        {/* Header — NO logout button here. Single sign-out is in sidebar only. */}
         <div className="lt-header">
           <button className="lt-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
             <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
@@ -960,65 +859,53 @@ export default function LabTechScreen({ techName = 'Kevin Liu', onSignOut }: Lab
           </div>
           <div style={{ fontSize:12.5, color:'var(--muted)' }}>{today}</div>
 
-          {/* Clickable profile avatar with hover tooltip */}
+          {/* ── Profile wrap — Patient-style hover card ── */}
           <div className="lt-profile-wrap">
-            <div className="lt-profile-avatar" onClick={() => setShowProfile(true)}>
-              {abb}
-              <div className="lt-profile-tooltip">
-                <div style={{ fontWeight:700, fontSize:13, color:'var(--text)' }}>{techName}</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Senior Lab Technician</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>lab@vexoo.in</div>
-                <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
-              </div>
+            <div className="lt-profile-avatar" onClick={() => setShowProfile(true)}>{abb}</div>
+            <div className="lt-profile-tooltip">
+              <div className="lt-tt-avatar">{abb}</div>
+              <div className="lt-tt-name">{techName}</div>
+              <div className="lt-tt-sub">Senior Lab Technician</div>
+              <div className="lt-tt-sub">lab@vexoo.in</div>
+              <div className="lt-tt-divider" />
+              <button className="lt-tt-action profile" onClick={() => setShowProfile(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+                View / Edit Profile
+              </button>
+              <button className="lt-tt-action signout" onClick={onSignOut}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Sign out
+              </button>
             </div>
           </div>
         </div>
-
         {screenEl}
       </div>
 
       {/* ── Profile Modal ── */}
       {showProfile && (
-        <div onClick={() => setShowProfile(false)} style={{
-          position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          zIndex:200, backdropFilter:'blur(2px)'
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background:'white', borderRadius:16, padding:28,
-            width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)',
-            border:'1px solid var(--border)'
-          }}>
+        <div onClick={() => setShowProfile(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, backdropFilter:'blur(2px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'white', borderRadius:16, padding:28, width:420, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,0.2)', border:'1px solid var(--border)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22 }}>
-              <div style={{ width:60, height:60, borderRadius:'50%',
-                background:'linear-gradient(135deg,var(--primary),var(--purple))',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
+              <div style={{ width:60, height:60, borderRadius:'50%', background:'linear-gradient(135deg,var(--primary),var(--purple))', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:22, fontWeight:700 }}>{abb}</div>
               <div>
                 <div style={{ fontWeight:700, fontSize:17 }}>{techName}</div>
                 <div style={{ fontSize:13, color:'var(--muted)' }}>Senior Lab Technician · Lab Portal</div>
               </div>
             </div>
-            {[['Full Name', techName], ['Email', 'lab@vexoo.in'], ['Phone', '+91 98765 43210'], ['Lab Registration No.', 'LT/2019/TS/00482'], ['Role', 'Senior Lab Technician']].map(([label, val]) => (
+            {[['Full Name',techName],['Email','lab@vexoo.in'],['Phone','+91 98765 43210'],['Lab Registration No.','LT/2019/TS/00482'],['Role','Senior Lab Technician']].map(([label,val]) => (
               <div key={label} style={{ marginBottom:14 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'var(--muted)', marginBottom:5 }}>{label}</div>
-                <input defaultValue={val} style={{
-                  width:'100%', padding:'9px 12px', border:'1px solid var(--border)',
-                  borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit',
-                  color:'var(--text)', background:'var(--bg)'
-                }} />
+                <input defaultValue={val} style={{ width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:9, fontSize:13.5, outline:'none', fontFamily:'inherit', color:'var(--text)', background:'var(--bg)' }} />
               </div>
             ))}
             <div style={{ display:'flex', gap:10, marginTop:20 }}>
-              <button onClick={() => setShowProfile(false)} style={{
-                flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)',
-                background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5
-              }}>Close</button>
-              <button style={{
-                flex:1, padding:'10px', borderRadius:10, border:'none',
-                background:'var(--primary)', color:'white', cursor:'pointer',
-                fontFamily:'inherit', fontSize:13.5, fontWeight:600
-              }}>Save Changes</button>
+              <button onClick={() => setShowProfile(false)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5 }}>Close</button>
+              <button style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'var(--primary)', color:'white', cursor:'pointer', fontFamily:'inherit', fontSize:13.5, fontWeight:600 }}>Save Changes</button>
             </div>
           </div>
         </div>

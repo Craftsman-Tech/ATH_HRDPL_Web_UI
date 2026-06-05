@@ -15,18 +15,17 @@
  *    doctorName?  — from AuthContext (e.g. "Dr. Amy Chen")
  *    onSignOut?   — called when Logout is clicked
  *
- *  FIX (May 2026): Sidebar footer now shows a clearly-labelled "Sign out"
- *  button with a logout icon, separate from the user identity row.
- *  Previously the dr-user-row div had onClick={onSignOut} with no visible
- *  label, making it impossible for users to know they could sign out.
+ *  UPDATED (Jun 2026):
+ *  - Header profile card now matches the Patient-screen style:
+ *    avatar circle · name · role · email · divider · View/Edit Profile
+ *    (opens modal) · Sign out (calls onSignOut). Uses display:none/block
+ *    so the hidden card never blocks clicks on content behind it.
  * ============================================================================
  */
 
 import React, {
   useState, useMemo, useCallback, useEffect, useRef,
 } from 'react';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ScreenId = 'queue' | 'patients' | 'emr' | 'rx' | 'lab' | 'messages' | 'schedule';
 type BadgeKey =
@@ -45,14 +44,10 @@ interface Patient {
 interface Message { from: 'doctor' | 'patient'; text: string; time: string; }
 interface Convo { name: string; last: string; time: string; unread: number; msgs: Message[]; }
 
-// ─── Props ───────────────────────────────────────────────────────────────────
-
 interface DoctorScreenProps {
   doctorName?: string;
   onSignOut?: () => void;
 }
-
-// ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -134,10 +129,8 @@ const CSS = `
 .dr-nav-badge.active-badge { background: rgba(255,255,255,0.25); }
 .dr-nav-badge.default      { background: var(--rose); }
 
-/* ── Sidebar footer: user identity + sign out button ── */
-.dr-sidebar-user {
-  border-top: 1px solid rgba(255,255,255,0.07); padding: 12px;
-}
+/* ── Sidebar footer ── */
+.dr-sidebar-user { border-top: 1px solid rgba(255,255,255,0.07); padding: 12px; }
 .dr-user-identity {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 12px; border-radius: 10px; margin-bottom: 8px;
@@ -157,32 +150,53 @@ const CSS = `
   font-size: 13px; font-weight: 500; cursor: pointer;
   transition: background 0.13s, color 0.13s, border-color 0.13s;
 }
-.dr-signout-btn:hover {
-  background: rgba(225,29,72,0.12); color: #f87171;
-  border-color: rgba(225,29,72,0.25);
-}
+.dr-signout-btn:hover { background: rgba(225,29,72,0.12); color: #f87171; border-color: rgba(225,29,72,0.25); }
 .dr-signout-btn svg { flex-shrink: 0; }
 
-/* ── Profile avatar tooltip & modal ── */
+/* ── Profile wrap (header top-right) — Patient-style card ── */
 .dr-profile-wrap { position: relative; }
 .dr-profile-avatar {
   width: 36px; height: 36px; border-radius: 50%;
   background: linear-gradient(135deg,#4f6ef7,#7c3aed);
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 700; font-size: 13px;
-  cursor: pointer; flex-shrink: 0; transition: opacity 0.15s;
+  cursor: pointer; flex-shrink: 0; transition: box-shadow 0.15s;
 }
-.dr-profile-avatar:hover { opacity: 0.85; }
+.dr-profile-wrap:hover .dr-profile-avatar { box-shadow: 0 0 0 3px rgba(79,110,247,0.25); }
+
 .dr-profile-tooltip {
-  position: absolute; top: calc(100% + 10px); right: 0;
-  background: white; border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  min-width: 200px; z-index: 100; pointer-events: none;
-  opacity: 0; transform: translateY(-4px);
-  transition: opacity 0.15s, transform 0.15s; white-space: nowrap;
+  display: none; position: absolute; top: calc(100% + 10px); right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; min-width: 230px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+  z-index: 1000;
 }
-.dr-profile-wrap:hover .dr-profile-tooltip { opacity: 1; transform: translateY(0); }
+.dr-profile-wrap:hover .dr-profile-tooltip { display: block; }
+.dr-profile-tooltip::before {
+  content: ''; position: absolute;
+  top: -12px; left: 0; right: 0; height: 12px;
+}
+
+.dr-tt-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: linear-gradient(135deg,#4f6ef7,#7c3aed);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 16px; margin-bottom: 12px;
+}
+.dr-tt-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.dr-tt-sub  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.dr-tt-divider { height: 1px; background: var(--border); margin: 12px 0; }
+.dr-tt-action {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 10px; border-radius: 9px; border: none; background: transparent;
+  font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif; transition: background 0.13s;
+}
+.dr-tt-action svg { flex-shrink: 0; }
+.dr-tt-action.profile { color: var(--primary); }
+.dr-tt-action.profile:hover { background: var(--primary-light); }
+.dr-tt-action.signout { color: var(--rose); }
+.dr-tt-action.signout:hover { background: var(--rose-light); }
 
 /* mobile overlay */
 .dr-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9; }
@@ -198,6 +212,7 @@ const CSS = `
   display: flex; align-items: center; padding: 0 24px; height: 60px;
   background: var(--card); border-bottom: 1px solid var(--border);
   gap: 14px; flex-shrink: 0;
+  position: relative; z-index: 15;
 }
 .dr-header-title { font-weight: 700; font-size: 16px; }
 .dr-header-date  { font-size: 11.5px; color: var(--muted); }
@@ -556,8 +571,6 @@ function SvgIcon({ path, size = 17, color = 'currentColor' }: { path: string; si
   );
 }
 
-// ─── Nav config ───────────────────────────────────────────────────────────────
-
 const NAV: NavItem[] = [
   { id:'queue',    label:"Today's Queue",  badge:8, path:'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z' },
   { id:'patients', label:'My Patients',                path:'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z' },
@@ -577,13 +590,11 @@ const SCREEN_TITLES: Record<ScreenId, string> = {
 
 const QueueScreen: React.FC<{ onNav: (s: ScreenId) => void; doctorName: string }> = ({ onNav }) => {
   const [sel, setSel] = useState<Patient>(PATIENTS[0]);
-
   const avatarStyle = (p: Patient) => {
     if (p.status === 'Urgent')  return { bg:'#ffe4e6', color:'#e11d48' };
     if (p.status === 'In Room') return { bg:'#dbeafe', color:'#3b82f6' };
     return { bg:'var(--primary-light)', color:'var(--primary)' };
   };
-
   return (
     <div className="dr-queue-grid dr-fade">
       <div className="dr-queue-list">
@@ -612,7 +623,6 @@ const QueueScreen: React.FC<{ onNav: (s: ScreenId) => void; doctorName: string }
           );
         })}
       </div>
-
       <div className="dr-queue-detail">
         <div className="dr-detail-header">
           <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
@@ -627,7 +637,6 @@ const QueueScreen: React.FC<{ onNav: (s: ScreenId) => void; doctorName: string }
             <Badge label={`${sel.risk} Risk`} />
           </div>
         </div>
-
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
           <div>
             <div className="dr-section-label">Current Vitals</div>
@@ -645,14 +654,12 @@ const QueueScreen: React.FC<{ onNav: (s: ScreenId) => void; doctorName: string }
               ))}
             </div>
           </div>
-
           <div>
             <div className="dr-section-label">Clinical Notes</div>
             <div style={{ background:'#fffef5', border:'1px solid #fef3c7', borderRadius:12, padding:'12px 14px', fontSize:13.5, color:'#374151', lineHeight:1.7 }}>
               {sel.notes}
             </div>
           </div>
-
           <div>
             <div className="dr-section-label">Quick Actions</div>
             <div className="dr-action-grid">
@@ -665,7 +672,6 @@ const QueueScreen: React.FC<{ onNav: (s: ScreenId) => void; doctorName: string }
               ))}
             </div>
           </div>
-
           <div>
             <div className="dr-section-label">Active Medications</div>
             {['Lisinopril 10mg · Daily','Aspirin 81mg · Daily','Amlodipine 5mg · Daily'].map(m => (
@@ -675,7 +681,6 @@ const QueueScreen: React.FC<{ onNav: (s: ScreenId) => void; doctorName: string }
               </div>
             ))}
           </div>
-
           <button className="dr-start-btn">Start Consultation</button>
         </div>
       </div>
@@ -692,7 +697,6 @@ const PatientsScreen: React.FC = () => {
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.condition.toLowerCase().includes(search.toLowerCase())
     ), [search]);
-
   return (
     <div className="dr-scroll dr-fade" style={{ padding:20 }}>
       <div style={{ display:'flex', gap:10, marginBottom:16 }}>
@@ -730,7 +734,6 @@ type EMRTab = 'notes' | 'medications' | 'vitals' | 'history' | 'attachments';
 const EMRScreen: React.FC = () => {
   const [tab, setTab] = useState<EMRTab>('notes');
   const EMR_TABS: EMRTab[] = ['notes','medications','vitals','history','attachments'];
-
   return (
     <div className="dr-scroll dr-fade" style={{ padding:20 }}>
       <div className="dr-emr-layout">
@@ -742,7 +745,6 @@ const EMRScreen: React.FC = () => {
             </div>
           ))}
         </div>
-
         <div className="dr-card" style={{ padding:0, overflow:'hidden' }}>
           <div className="dr-emr-header">
             <div style={{ fontWeight:700, fontSize:17, marginBottom:4 }}>
@@ -757,7 +759,6 @@ const EMRScreen: React.FC = () => {
               ))}
             </div>
           </div>
-
           <div style={{ padding:22 }}>
             {tab === 'notes' && (
               <div>
@@ -832,32 +833,19 @@ const RxScreen: React.FC = () => (
         <div className="dr-rx-form-grid">
           <div>
             <div className="dr-field-label">Patient</div>
-            <select className="dr-select">
-              {PATIENTS.map(p => <option key={p.id}>{p.name}</option>)}
-            </select>
+            <select className="dr-select">{PATIENTS.map(p => <option key={p.id}>{p.name}</option>)}</select>
           </div>
           <div>
             <div className="dr-field-label">Medication / Drug</div>
             <input className="dr-input" placeholder="e.g. Lisinopril 10mg" />
           </div>
-          <div>
-            <div className="dr-field-label">Dosage</div>
-            <input className="dr-input" placeholder="e.g. 10mg" />
-          </div>
+          <div><div className="dr-field-label">Dosage</div><input className="dr-input" placeholder="e.g. 10mg" /></div>
           <div>
             <div className="dr-field-label">Frequency</div>
-            <select className="dr-select">
-              {['Once daily','Twice daily','Three times daily','As needed'].map(o => <option key={o}>{o}</option>)}
-            </select>
+            <select className="dr-select">{['Once daily','Twice daily','Three times daily','As needed'].map(o => <option key={o}>{o}</option>)}</select>
           </div>
-          <div>
-            <div className="dr-field-label">Duration</div>
-            <input className="dr-input" placeholder="e.g. 30 days" />
-          </div>
-          <div>
-            <div className="dr-field-label">Refills</div>
-            <input className="dr-input" placeholder="e.g. 2" />
-          </div>
+          <div><div className="dr-field-label">Duration</div><input className="dr-input" placeholder="e.g. 30 days" /></div>
+          <div><div className="dr-field-label">Refills</div><input className="dr-input" placeholder="e.g. 2" /></div>
         </div>
         <div style={{ marginBottom:14 }}>
           <div className="dr-field-label" style={{ marginBottom:5 }}>Special Instructions</div>
@@ -868,7 +856,6 @@ const RxScreen: React.FC = () => (
           <button className="dr-btn-ghost">Save Draft</button>
         </div>
       </div>
-
       <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
         <div className="dr-card">
           <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>Recent Prescriptions</div>
@@ -905,33 +892,21 @@ const LAB_TESTS = [
 
 const LabScreen: React.FC = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const toggle = (t: string) => setSelected(s => {
-    const next = new Set(s);
-    next.has(t) ? next.delete(t) : next.add(t);
-    return next;
-  });
-
+  const toggle = (t: string) => setSelected(s => { const n = new Set(s); n.has(t) ? n.delete(t) : n.add(t); return n; });
   return (
     <div className="dr-scroll dr-fade" style={{ padding:20 }}>
       <div className="dr-lab-layout">
         <div className="dr-card">
           <div style={{ fontWeight:700, fontSize:16, marginBottom:18 }}>Order Lab Test</div>
           <div className="dr-rx-form-grid">
-            <div>
-              <div className="dr-field-label">Patient</div>
-              <select className="dr-select">{PATIENTS.map(p => <option key={p.id}>{p.name}</option>)}</select>
-            </div>
-            <div>
-              <div className="dr-field-label">Priority</div>
-              <select className="dr-select">{['Routine','Urgent','STAT'].map(o => <option key={o}>{o}</option>)}</select>
-            </div>
+            <div><div className="dr-field-label">Patient</div><select className="dr-select">{PATIENTS.map(p => <option key={p.id}>{p.name}</option>)}</select></div>
+            <div><div className="dr-field-label">Priority</div><select className="dr-select">{['Routine','Urgent','STAT'].map(o => <option key={o}>{o}</option>)}</select></div>
           </div>
           <div className="dr-field-label" style={{ marginBottom:10 }}>Select Tests</div>
           <div className="dr-lab-test-grid">
             {LAB_TESTS.map(t => (
               <label key={t} className="dr-lab-test-label" onClick={() => toggle(t)}>
-                <input type="checkbox" checked={selected.has(t)} onChange={() => toggle(t)}
-                  style={{ accentColor:'var(--primary)', width:14, height:14 }} />
+                <input type="checkbox" checked={selected.has(t)} onChange={() => toggle(t)} style={{ accentColor:'var(--primary)', width:14, height:14 }} />
                 {t}
               </label>
             ))}
@@ -942,7 +917,6 @@ const LabScreen: React.FC = () => {
           </div>
           <button className="dr-btn-primary teal">Submit Lab Order</button>
         </div>
-
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <div className="dr-card">
             <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>Pending Results</div>
@@ -984,18 +958,13 @@ const MessagesScreen: React.FC = () => {
   const [draft, setDraft] = useState('');
   const [convos, setConvos] = useState<Convo[]>(CONVOS);
   const threadRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
-  }, [sel, convos]);
-
+  useEffect(() => { if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight; }, [sel, convos]);
   const send = () => {
     if (!draft.trim()) return;
     const msg: Message = { from:'doctor', text:draft.trim(), time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) };
     setConvos(c => c.map((cv,i) => i === sel ? { ...cv, msgs:[...cv.msgs,msg], last:draft.trim() } : cv));
     setDraft('');
   };
-
   return (
     <div className="dr-msg-layout dr-fade">
       <div className="dr-msg-sidebar">
@@ -1075,9 +1044,6 @@ const ScheduleScreen: React.FC = () => {
 };
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-// FIX: Footer is now split into two elements:
-//   1. dr-user-identity  — read-only display of name + avatar (not clickable)
-//   2. dr-signout-btn    — clearly labelled "Sign out" button with logout icon
 
 const Sidebar: React.FC<{
   active: ScreenId; onNav: (s: ScreenId) => void;
@@ -1097,7 +1063,6 @@ const Sidebar: React.FC<{
           <div style={{ color:'rgba(255,255,255,0.4)', fontSize:10.5 }}>Doctor Portal</div>
         </div>
       </div>
-
       <div className="dr-nav-label">Clinical</div>
       <nav className="dr-nav">
         {NAV.map(item => {
@@ -1106,17 +1071,12 @@ const Sidebar: React.FC<{
             <button key={item.id} className={`dr-nav-btn ${on ? 'active' : 'inactive'}`} onClick={() => onNav(item.id)}>
               <SvgIcon path={item.path} size={17} color="currentColor" />
               <span style={{ flex:1, textAlign:'left' }}>{item.label}</span>
-              {item.badge && (
-                <span className={`dr-nav-badge ${on ? 'active-badge' : 'default'}`}>{item.badge}</span>
-              )}
+              {item.badge && <span className={`dr-nav-badge ${on ? 'active-badge' : 'default'}`}>{item.badge}</span>}
             </button>
           );
         })}
       </nav>
-
-      {/* Sidebar footer: user identity (read-only) + sign out button */}
       <div className="dr-sidebar-user">
-        {/* User identity row — not clickable, just shows who is signed in */}
         <div className="dr-user-identity">
           <div className="dr-user-avatar">{abb}</div>
           <div>
@@ -1124,12 +1084,9 @@ const Sidebar: React.FC<{
             <div style={{ color:'rgba(255,255,255,0.4)', fontSize:11 }}>Cardiologist</div>
           </div>
         </div>
-
-        {/* Sign out button — clearly labelled with icon */}
         <button className="dr-signout-btn" onClick={onSignOut} type="button">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" strokeWidth="2.2"
-               strokeLinecap="round" strokeLinejoin="round">
+               stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
@@ -1155,7 +1112,6 @@ export default function DoctorScreen({ doctorName = 'Dr. Amy Chen', onSignOut }:
   }, []);
 
   const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); }, []);
-
   const today = new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   const screenEl = useMemo(() => {
@@ -1173,14 +1129,11 @@ export default function DoctorScreen({ doctorName = 'Dr. Amy Chen', onSignOut }:
   return (
     <div className="dr-root">
       <style>{CSS}</style>
-
       {mobileOpen && <div className="dr-overlay open" onClick={() => setMobile(false)} />}
-
       <Sidebar active={screen} onNav={handleNav} mobileOpen={mobileOpen}
         doctorName={doctorName} onSignOut={onSignOut} />
-
       <div className="dr-main">
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="dr-header">
           <button className="dr-hamburger" onClick={() => setMobile(o => !o)} aria-label="Open menu" style={{ display:'none' }}>
             <SvgIcon path="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" size={22} color="var(--text)" />
@@ -1190,19 +1143,39 @@ export default function DoctorScreen({ doctorName = 'Dr. Amy Chen', onSignOut }:
             <div className="dr-header-date">{today}</div>
           </div>
           <div className="dr-header-spacer" />
+
+          {/* ── Profile wrap — Patient-style hover card ── */}
           <div className="dr-profile-wrap">
             <div className="dr-profile-avatar" onClick={() => setShowProfile(true)}>
               {initials(doctorName)}
-              <div className="dr-profile-tooltip">
-                <div style={{ fontWeight:700, fontSize:13 }}>{doctorName}</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Cardiologist</div>
-                <div style={{ fontSize:11, color:'var(--primary)', marginTop:8, fontWeight:600 }}>Click to view profile →</div>
-              </div>
+            </div>
+            <div className="dr-profile-tooltip">
+              <div className="dr-tt-avatar">{initials(doctorName)}</div>
+              <div className="dr-tt-name">{doctorName}</div>
+              <div className="dr-tt-sub">Cardiologist</div>
+              <div className="dr-tt-sub">doctor@vexoo.in</div>
+              <div className="dr-tt-divider" />
+              <button className="dr-tt-action profile" onClick={() => setShowProfile(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                View / Edit Profile
+              </button>
+              <button className="dr-tt-action signout" onClick={onSignOut}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Sign out
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Screen */}
         {screenEl}
       </div>
 
