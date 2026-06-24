@@ -12,7 +12,7 @@
  *    4) On failure → shows the i18n'd "Those credentials don't match…" note.
  * ============================================================================
  */
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Role, LangCode } from '@vexoo/shared';
 import { useAuth }  from '../components/AuthContext';
@@ -62,11 +62,57 @@ const ROLE_ICONS: Record<Role, string> = {
   Patient:      'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
 };
 
+// Self-contained styles for the support modal — injected via a <style> tag so
+// this works without touching styles/signin.css. Mineral/ink Vexoo palette;
+// readable on both the light and dark sign-in themes.
+const VX_HELP_CSS = `
+.vx-help-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(11,15,14,.55);backdrop-filter:blur(3px);animation:vxHelpFade .16s ease}
+@keyframes vxHelpFade{from{opacity:0}to{opacity:1}}
+.vx-help-modal{width:100%;max-width:520px;max-height:92vh;overflow-y:auto;background:#FAFAF7;color:#0B0F0E;border:1px solid #E4E6E4;border-radius:18px;box-shadow:0 24px 60px rgba(11,15,14,.32);padding:24px;font-family:'Inter Tight',Inter,system-ui,sans-serif}
+.vx-help-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px}
+.vx-help-title{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:500;letter-spacing:-.02em}
+.vx-help-sub{font-size:13px;color:#6B7270;margin-top:3px}
+.vx-help-x{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:9px;border:1px solid #E4E6E4;background:#fff;color:#454C4B;cursor:pointer;transition:.15s}
+.vx-help-x:hover{color:#0E7C66;border-color:#0E7C66}
+.vx-help-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;margin-bottom:14px}
+.vx-help-field{margin-bottom:14px;display:flex;flex-direction:column}
+.vx-help-grid .vx-help-field{margin-bottom:0}
+.vx-help-label{font-size:11px;font-weight:600;color:#6B7270;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.vx-help-input,.vx-help-textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;color:#0B0F0E;background:#fff;border:1px solid #E4E6E4;border-radius:10px;padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+.vx-help-input:focus,.vx-help-textarea:focus{outline:none;border-color:#0E7C66;box-shadow:0 0 0 3px rgba(14,124,102,.12)}
+.vx-help-input[readonly]{background:#F5F6F4;color:#454C4B}
+.vx-help-textarea{min-height:130px;resize:vertical;line-height:1.6}
+.vx-help-upload{display:flex;align-items:center;gap:9px;width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;font-weight:600;color:#454C4B;background:#F5F6F4;border:1px dashed #C4C8C6;border-radius:10px;padding:12px 14px;cursor:pointer;margin-bottom:18px;transition:.15s}
+.vx-help-upload:hover{border-color:#0E7C66;background:#EAF6F2;color:#0E7C66}
+.vx-help-actions{display:flex;justify-content:flex-end;gap:10px}
+.vx-help-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-family:inherit;font-size:14px;font-weight:600;color:#fff;background:#0E7C66;border:none;border-radius:11px;padding:11px 20px;cursor:pointer;transition:.15s}
+.vx-help-btn:hover{background:#0A4A3D}
+.vx-help-btn:disabled{opacity:.5;cursor:not-allowed}
+.vx-help-btn.ghost{background:transparent;color:#454C4B;border:1px solid #E4E6E4}
+.vx-help-btn.ghost:hover{background:#F5F6F4;color:#0B0F0E}
+.vx-help-success{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;padding:18px 6px 6px}
+.vx-help-success-icon{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:#0E7C66;color:#fff;box-shadow:0 8px 20px rgba(14,124,102,.32)}
+.vx-help-banner{background:#EAF6F2;color:#0A4A3D;border:1px solid #9FD6CD;border-radius:11px;padding:13px 16px;font-size:14px;font-weight:600;line-height:1.5}
+@media(max-width:520px){.vx-help-grid{grid-template-columns:1fr}.vx-help-modal{padding:18px}}
+`;
+
 export default function SignInScreen() {
   const nav = useNavigate();
   const { signIn } = useAuth();
   const { mode, toggle } = useTheme();
   const { code: lang, set: setLang, t } = useLang();
+
+  // Load the Vexoo type family (Fraunces + Inter Tight + JetBrains Mono) so the
+  // sign-in matches the portals. Each portal injects this on mount; the sign-in
+  // previously did not, so its Fraunces/Inter Tight fell back to system fonts.
+  useEffect(() => {
+    const id = 'vexoo-signin-fonts';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id; link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap';
+    document.head.appendChild(link);
+  }, []);
 
   // Form state
   const [role,     setRole]     = useState<Role>('Receptionist');
@@ -74,6 +120,27 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [err,      setErr]      = useState('');
   const [loading,  setLoading]  = useState(false);
+
+  // ── "Vexoo Customer Support" help form (self-contained; see modal below) ──
+  const [showHelp,  setShowHelp]  = useState(false);
+  const [helpName,  setHelpName]  = useState('');
+  const [helpPhone, setHelpPhone] = useState('');
+  const [helpEmail, setHelpEmail] = useState('');
+  const [helpMsg,   setHelpMsg]   = useState('');
+  const [helpFile,  setHelpFile]  = useState('');
+  const [helpSent,  setHelpSent]  = useState(false);
+
+  const openHelp = () => {
+    // Prefill from whatever the user has already entered on the sign-in form.
+    setHelpEmail(email);
+    setHelpSent(false);
+    setShowHelp(true);
+  };
+  const submitHelp = () => {
+    if (!helpName.trim() || !helpMsg.trim()) return;
+    // TODO(backend): POST to the Vexoo support endpoint.
+    setHelpSent(true);
+  };
 
   // Picking a role auto-fills the matching demo email — convenience that
   // shipped in the original design.
@@ -243,9 +310,71 @@ export default function SignInScreen() {
           <span className="sep">·</span>
           <a href="#">{t.signIn.register}</a>
           <span className="sep">·</span>
-          <button type="button">{t.signIn.help}</button>
+          <button type="button" onClick={openHelp}>{t.signIn.help}</button>
         </div>
       </section>
+
+      {/* ─── VEXOO CUSTOMER SUPPORT (self-contained help modal) ─────────── */}
+      {showHelp && (
+        <div className="vx-help-overlay" onClick={() => setShowHelp(false)}>
+          <style>{VX_HELP_CSS}</style>
+          <div className="vx-help-modal" onClick={e => e.stopPropagation()}>
+            <div className="vx-help-head">
+              <div>
+                <div className="vx-help-title">Vexoo Customer Support</div>
+                <div className="vx-help-sub">Tell us what's going wrong — our team will reach out soon.</div>
+              </div>
+              <button className="vx-help-x" onClick={() => setShowHelp(false)} aria-label="Close">
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {helpSent ? (
+              <div className="vx-help-success">
+                <div className="vx-help-success-icon">
+                  <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m20 6-11 11-5-5" /></svg>
+                </div>
+                <div className="vx-help-banner">Message Sent Successfully, Our team will Reach out soon</div>
+                <button className="vx-help-btn" onClick={() => setShowHelp(false)}>Done</button>
+              </div>
+            ) : (
+              <>
+                <div className="vx-help-grid">
+                  <div className="vx-help-field">
+                    <label className="vx-help-label">Full Name</label>
+                    <input className="vx-help-input" value={helpName} onChange={e => setHelpName(e.target.value)} placeholder="Your name" />
+                  </div>
+                  <div className="vx-help-field">
+                    <label className="vx-help-label">Phone</label>
+                    <input className="vx-help-input" value={helpPhone} onChange={e => setHelpPhone(e.target.value)} placeholder="+91 …" />
+                  </div>
+                  <div className="vx-help-field">
+                    <label className="vx-help-label">Email</label>
+                    <input className="vx-help-input" value={helpEmail} onChange={e => setHelpEmail(e.target.value)} placeholder="you@example.com" />
+                  </div>
+                  <div className="vx-help-field">
+                    <label className="vx-help-label">Role</label>
+                    <input className="vx-help-input" value={t.roles[role]} readOnly />
+                  </div>
+                </div>
+                <div className="vx-help-field">
+                  <label className="vx-help-label">Describe your issue</label>
+                  <textarea className="vx-help-textarea" value={helpMsg} onChange={e => setHelpMsg(e.target.value)} placeholder="Tell us what happened, what you expected, and any error you saw…" />
+                </div>
+                <label className="vx-help-upload">
+                  <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                  {helpFile || 'Attach a screenshot (optional)'}
+                  <input type="file" style={{ display: 'none' }} onChange={e => setHelpFile(e.target.files?.[0]?.name || '')} />
+                </label>
+                <div className="vx-help-actions">
+                  <button className="vx-help-btn ghost" onClick={() => setShowHelp(false)}>Cancel</button>
+                  <button className="vx-help-btn" disabled={!helpName.trim() || !helpMsg.trim()} onClick={submitHelp}>Submit Request</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

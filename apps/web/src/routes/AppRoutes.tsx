@@ -74,7 +74,7 @@ function HospitalAdminRoute() {
 // Nurse / Receptionist portal.
 function ReceptionRoute() {
   const { user, signOut } = useAuth();
-  return <ReceptionScreen nurseName={user?.name} onSignOut={signOut} />;
+  return <ReceptionScreen receptionistName={user?.name} onSignOut={signOut} />;
 }
 
 function DoctorRoute() {
