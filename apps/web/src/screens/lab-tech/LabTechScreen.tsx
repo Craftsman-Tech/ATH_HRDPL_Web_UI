@@ -33,6 +33,7 @@ import { Completed } from './screens/Completed';
 import { Inventory } from './screens/Inventory';
 import { Equipment } from './screens/Equipment';
 import { Reports } from './screens/Reports';
+import { Settings } from './screens/Settings';
 
 /* ------------------------------------------------------------------ *
  *  Inner app — lives inside <LabProvider>, so it can read live store
@@ -73,6 +74,7 @@ function LabApp({ onSignOut }: { onSignOut?: () => void }) {
       case 'inventory':  return <Inventory />;
       case 'equipment':  return <Equipment />;
       case 'reports':    return <Reports />;
+      case 'settings':   return <Settings />;
     }
   }, [screen, handleNav]);
 

@@ -13,15 +13,11 @@
 
 // ─── Roles ──────────────────────────────────────────────────────────────────
 export type Role =
-  | 'SuperAdmin'     // platform/founder level — Founders' Console; approves
-                     // hospitals and issues each hospital's Admin credentials
-  | 'Admin'          // hospital administrator — signs in with credentials the
-                     // SuperAdmin created; manages a single hospital
+  | 'Admin'          // hospital administrator — manages a single hospital
   | 'Doctor'
   | 'Receptionist'   // includes Nurse — same portal in current design
   | 'Pharmacist'
-  | 'LabTech'
-  | 'Patient';
+  | 'LabTech';
 
 // ─── Status enums ───────────────────────────────────────────────────────────
 // Strings instead of numeric enums so they're safe to display directly and

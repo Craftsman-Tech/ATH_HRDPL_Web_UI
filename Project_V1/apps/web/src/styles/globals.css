@@ -1,0 +1,105 @@
+/* ============================================================================
+   GLOBAL STYLES — Vexoo Web
+   ----------------------------------------------------------------------------
+   This file:
+     1) Resets browser defaults to a sane baseline.
+     2) Declares CSS custom properties from our shared tokens (see ThemeProvider
+        for runtime injection — these defaults match the LIGHT theme).
+     3) Provides class-based utilities used by multiple screens.
+   ========================================================================== */
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* CSS variables — light theme defaults. ThemeProvider overrides these
+   at runtime when the user toggles dark mode. */
+:root {
+  --bg:               #faf9f7;
+  --card:             #ffffff;
+  --sidebar:          #1c2537;
+  --sidebar-hover:    #253048;
+  --primary:          #0d9488;
+  --primary-light:    #e6faf8;
+  --text:             #1c2537;
+  --text-muted:       #64748b;
+  --border:           #e8e4dc;
+
+  --status-success-bg:  #e6faf8;
+  --status-success-fg:  #0d9488;
+  --status-warning-bg:  #fef3c7;
+  --status-warning-fg:  #d97706;
+  --status-danger-bg:   #ffe4e6;
+  --status-danger-fg:   #e11d48;
+  --status-info-bg:     #dbeafe;
+  --status-info-fg:     #3b82f6;
+  --status-purple-bg:   #ede9fe;
+  --status-purple-fg:   #7c3aed;
+  --status-neutral-bg:  #f1f5f9;
+  --status-neutral-fg:  #64748b;
+}
+
+/* The Fraunces serif — used for hero headlines only */
+.display { font-family: 'Fraunces', Georgia, serif; font-weight: 500; }
+.mono    { font-family: 'JetBrains Mono', monospace; }
+
+/* Scrollbars — slim and unobtrusive, matching the mockups */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1cec8; border-radius: 4px; }
+
+/* Buttons reset — every <button> in the app starts as a plain interactive */
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* Inputs reset */
+input, textarea, select { font-family: inherit; }
+
+/* Useful animations */
+@keyframes fadeIn   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse    { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.fade-in { animation: fadeIn 0.22s ease both; }
+.fade-up { animation: fadeUp 0.4s cubic-bezier(0.2,0.9,0.3,1) both; }
+
+/* Dark theme — activated by ThemeProvider setting <html data-theme="dark">. */
+[data-theme="dark"] {
+  --bg:               #0f1623;
+  --card:             #1a2230;
+  --sidebar:          #0a0f1a;
+  --sidebar-hover:    #1a2230;
+  --primary:          #2dd4bf;
+  --primary-light:    rgba(45,212,191,0.15);
+  --text:             #f1f5f9;
+  --text-muted:       #94a3b8;
+  --border:           rgba(255,255,255,0.08);
+
+  --status-success-bg: rgba(45,212,191,0.15);
+  --status-success-fg: #2dd4bf;
+  --status-warning-bg: rgba(251,191,36,0.15);
+  --status-warning-fg: #fbbf24;
+  --status-danger-bg:  rgba(248,113,113,0.15);
+  --status-danger-fg:  #f87171;
+  --status-info-bg:    rgba(96,165,250,0.15);
+  --status-info-fg:    #60a5fa;
+  --status-purple-bg:  rgba(192,132,252,0.15);
+  --status-purple-fg:  #c084fc;
+  --status-neutral-bg: rgba(255,255,255,0.05);
+  --status-neutral-fg: #94a3b8;
+}

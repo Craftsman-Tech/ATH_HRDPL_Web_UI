@@ -20,27 +20,21 @@ import { useTheme, useLang } from '../components/ThemeContext';
 import '../styles/signin.css';
 
 // Role list — order and demo-email mapping matches the original.
-// SuperAdmin is listed first: it's the platform/founder account that approves
-// hospitals and creates each hospital Admin's credentials.
 const ROLES: { id: Role; demoEmail: string }[] = [
-  { id: 'SuperAdmin',   demoEmail: 'superadmin@vexoo.in' },
   { id: 'Admin',        demoEmail: 'admin@vexoo.in'     },
   { id: 'Doctor',       demoEmail: 'doctor@vexoo.in'    },
   { id: 'Receptionist', demoEmail: 'reception@vexoo.in' },
   { id: 'Pharmacist',   demoEmail: 'pharmacy@vexoo.in'  },
   { id: 'LabTech',      demoEmail: 'lab@vexoo.in'       },
-  { id: 'Patient',      demoEmail: 'patient@vexoo.in'   },
 ];
 
 // Where each role lands after signing in.
 const ROLE_HOME: Record<Role, string> = {
-  SuperAdmin:   '/super-admin',
   Admin:        '/admin',
   Doctor:       '/doctor',
   Receptionist: '/reception',
   Pharmacist:   '/pharmacy',
   LabTech:      '/lab',
-  Patient:      '/patient',
 };
 
 // Simple SVG icon component to keep markup readable.
@@ -53,14 +47,31 @@ const Icon = ({ d, size = 13 }: { d: string; size?: number }) => (
 
 // SVG paths used in the role buttons (taken from the original mockup).
 const ROLE_ICONS: Record<Role, string> = {
-  SuperAdmin:   'M3 7l4 4 5-7 5 7 4-4v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
   Admin:        'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   Doctor:       'M22 12h-4l-3 9L9 3l-3 9H2',
   Receptionist: 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z',
   Pharmacist:   'M6.5 10h-2v3h-3v2h3v3h2v-3h3v-2h-3zm9.5 1c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z',
   LabTech:      'M6 2v6l2 2-6 10h16L12 10l2-2V2H6z',
-  Patient:      'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
 };
+
+// Self-contained styles for the two footer CTAs (clinic + patient registration)
+// — injected via a <style> tag so styles/signin.css stays untouched. Scoped under
+// .vx-cta-footer; uses the same mineral/ink palette vars as the rest of sign-in.
+const VX_CTA_CSS = `
+.vx-cta-footer{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-top:28px}
+.vx-cta-row{display:flex;gap:10px}
+.vx-cta-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:999px;font-family:'Inter Tight',Inter,system-ui,sans-serif;font-size:13px;font-weight:600;letter-spacing:.01em;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .05s ease;white-space:nowrap}
+.vx-cta-btn:active{transform:translateY(1px)}
+.vx-cta-btn svg{flex:none}
+.vx-cta-btn.primary{background:var(--vx-mineral,#0E7C66);border:1px solid var(--vx-mineral,#0E7C66);color:#FAFAF7}
+.vx-cta-btn.primary:hover{background:var(--vx-mineral-deep,#0A4A3D);border-color:var(--vx-mineral-deep,#0A4A3D)}
+.vx-cta-btn.ghost{background:transparent;border:1px solid var(--vx-line,#E4E6E4);color:var(--vx-text,#0B0F0E)}
+.vx-cta-btn.ghost:hover{border-color:var(--vx-mineral,#0E7C66);color:var(--vx-mineral,#0E7C66)}
+.vx-cta-help{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:2px;font-size:12px;color:var(--vx-muted,#6B7270)}
+.vx-cta-help button{background:none;border:none;padding:0;cursor:pointer;color:var(--vx-mineral,#0E7C66);font-weight:600;font-family:inherit;font-size:12px}
+.vx-cta-help button:hover{text-decoration:underline}
+@media (max-width:420px){.vx-cta-row{flex-direction:column}}
+`;
 
 // Self-contained styles for the support modal — injected via a <style> tag so
 // this works without touching styles/signin.css. Mineral/ink Vexoo palette;
@@ -302,15 +313,24 @@ export default function SignInScreen() {
           </div>
         </form>
 
-        {/* Footer — normal document flow (no absolute overlay, so it can never
-            sit on top of the language buttons and swallow their clicks). The
-            .form-panel column layout pins this to the bottom of the panel. */}
-        <div className="form-footer">
-          <span>{t.signIn.newClinic}</span>
-          <span className="sep">·</span>
-          <a href="#">{t.signIn.register}</a>
-          <span className="sep">·</span>
-          <button type="button" onClick={openHelp}>{t.signIn.help}</button>
+        {/* Footer — clinic self-registration CTA plus a quiet help link.
+            Normal document flow so it can never overlay the language buttons.
+            Styles are injected (VX_CTA_CSS) to keep styles/signin.css untouched. */}
+        <div className="vx-cta-footer">
+          <style>{VX_CTA_CSS}</style>
+          <div className="vx-cta-row">
+            <button
+              type="button"
+              className="vx-cta-btn ghost"
+              onClick={() => nav('/register')}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" /><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01" /></svg>
+              {t.signIn.newClinic} {t.signIn.register}
+            </button>
+          </div>
+          <div className="vx-cta-help">
+            <button type="button" onClick={openHelp}>{t.signIn.help}</button>
+          </div>
         </div>
       </section>
 

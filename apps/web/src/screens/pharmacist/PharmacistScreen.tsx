@@ -30,6 +30,7 @@ import { Inventory } from './screens/Inventory';
 import { PurchaseOrders } from './screens/PurchaseOrders';
 import { Suppliers } from './screens/Suppliers';
 import { Reports } from './screens/Reports';
+import { Settings } from './screens/Settings';
 
 export default function PharmacistScreen({
   pharmacistName = 'Maria Perez',
@@ -79,6 +80,7 @@ export default function PharmacistScreen({
       case 'purchase':  return <PurchaseOrders />;
       case 'suppliers': return <Suppliers />;
       case 'reports':   return <Reports />;
+      case 'settings':  return <Settings />;
       default:          return <Dashboard goTo={goTo} />;
     }
   }, [screen, invFilter, goTo]);

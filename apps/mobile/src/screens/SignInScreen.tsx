@@ -41,7 +41,6 @@ const ROLES: { id: Role; demoEmail: string }[] = [
   { id: 'Doctor',       demoEmail: 'doctor@vexoo.in'    },
   { id: 'Receptionist', demoEmail: 'reception@vexoo.in' },
   { id: 'Pharmacist',   demoEmail: 'pharmacy@vexoo.in'  },
-  { id: 'Patient',      demoEmail: 'patient@vexoo.in'   },
 ];
 
 const ROLE_ICON_PATHS: Record<Role, string> = {
@@ -50,7 +49,6 @@ const ROLE_ICON_PATHS: Record<Role, string> = {
   Receptionist: 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z',
   Pharmacist:   'M6.5 10h-2v3h-3v2h3v3h2v-3h3v-2h-3z',
   LabTech:      'M6 2v6l2 2-6 10h16L12 10l2-2V2H6z',
-  Patient:      'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
 };
 
 const ROLE_ACCENTS: Record<Role, string> = {
@@ -59,7 +57,6 @@ const ROLE_ACCENTS: Record<Role, string> = {
   Receptionist: '#0E7C66',
   Pharmacist:   '#5C6BC0',
   LabTech:      '#0A7A8F',
-  Patient:      '#2A7A4B',
 };
 
 // Navigation prop shape (loose typing — replace with proper RootStackParamList

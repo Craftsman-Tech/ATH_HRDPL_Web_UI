@@ -30,6 +30,7 @@ import { AnalyticsModule } from './screens/Analytics';
 import { NotificationsModule } from './screens/Notifications';
 import { StaffScreen } from './screens/Staff';
 import { ReviewsModule } from './screens/Reviews';
+import { SettingsScreen } from './screens/Settings';
 
 export default function HospitalAdminScreen({
   adminName = 'Anita Reddy',
@@ -71,6 +72,7 @@ export default function HospitalAdminScreen({
       case 'notifications': return <NotificationsModule />;
       case 'staff':         return <StaffScreen hospitalName="Apollo Multispecialty" />;
       case 'reviews':       return <ReviewsModule />;
+      case 'settings':      return <SettingsScreen hospitalName="Apollo Multispecialty" />;
       default:              return <Dashboard setModule={setModule} />;
     }
   }, [module]);

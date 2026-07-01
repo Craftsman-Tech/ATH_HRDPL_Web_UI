@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Vexoo",
+    "slug": "vexoo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1c2537"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vexoo.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1c2537"
+      },
+      "package": "com.vexoo.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-font"]
+  }
+}

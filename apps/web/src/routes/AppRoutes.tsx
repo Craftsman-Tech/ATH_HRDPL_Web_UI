@@ -6,29 +6,24 @@
  *  Routes that need a signed-in user are wrapped in <RequireAuth>; routes
  *  that should redirect already-signed-in users (Sign-In) use <RedirectIfAuth>.
  *
- *  All portals are now fully built:
- *    /super-admin → Founders' Console      (SuperAdmin)
+ *  Active portals:
  *    /admin       → Hospital Admin         (Admin)
  *    /doctor      → Doctor Portal          (Doctor)
  *    /reception   → Nurse/Receptionist     (Receptionist)
  *    /pharmacy    → Pharmacist Portal      (Pharmacist)
  *    /lab         → Lab Technician Portal  (LabTech)
- *    /patient     → Patient Portal         (Patient)
  * ============================================================================
  */
 import { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth }         from '../components/AuthContext';
 import SignInScreen        from '../screens/SignInScreen';
-import AdminScreen            from '../screens/admin/AdminScreen';
+import RegisterScreen      from '../screens/register/RegisterScreen';
 import HospitalAdminScreen    from '../screens/hospital-admin/HospitalAdminScreen';
 import ReceptionScreen        from '../screens/reception/ReceptionScreen';
 import DoctorScreen           from '../screens/doctor/DoctorScreen';
-import PatientScreen          from '../screens/patient/PatientScreen';
 import PharmacistScreen       from '../screens/pharmacist/PharmacistScreen';
 import LabTechScreen          from '../screens/lab-tech/LabTechScreen';
-
-// All portals are now built — GenericPlaceholder is no longer used.
 
 // ─── Route guards ───────────────────────────────────────────────────────────
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -44,9 +39,8 @@ function RedirectIfAuth({ children }: { children: ReactNode }) {
   // If already signed in, route them to their portal home.
   if (user) {
     const home = {
-      SuperAdmin:'/super-admin',
       Admin:'/admin', Doctor:'/doctor', Receptionist:'/reception',
-      Pharmacist:'/pharmacy', LabTech:'/lab', Patient:'/patient',
+      Pharmacist:'/pharmacy', LabTech:'/lab',
     }[user.role];
     return <Navigate to={home} replace />;
   }
@@ -54,17 +48,7 @@ function RedirectIfAuth({ children }: { children: ReactNode }) {
 }
 
 // ─── Connected screens ───────────────────────────────────────────────────────
-// The Founders' Console UI lives in AdminScreen.tsx; it is the SUPER ADMIN
-// portal. This wrapper bridges the real signed-in user into its props, so the
-// sidebar shows the actual signed-in name and Sign-out logs them out for real.
-// (The file is named AdminScreen for historical reasons — it can be renamed to
-//  SuperAdminScreen later; routing is what matters and is correct below.)
-function SuperAdminRoute() {
-  const { user, signOut } = useAuth();
-  return <AdminScreen adminName={user?.name} onSignOut={signOut} />;
-}
-
-// Hospital Admin portal — the account a SuperAdmin creates for each hospital.
+// Hospital Admin portal — the account a hospital signs in with.
 // Bridges the signed-in user's name and sign-out into HospitalAdminScreen.
 function HospitalAdminRoute() {
   const { user, signOut } = useAuth();
@@ -80,11 +64,6 @@ function ReceptionRoute() {
 function DoctorRoute() {
   const { user, signOut } = useAuth();
   return <DoctorScreen doctorName={user?.name} onSignOut={signOut} />;
-}
-
-function PatientRoute() {
-  const { user, signOut } = useAuth();
-  return <PatientScreen patientName={user?.name} onSignOut={signOut} />;
 }
 
 function PharmacistRoute() {
@@ -110,12 +89,10 @@ export default function AppRoutes() {
           <RedirectIfAuth><SignInScreen /></RedirectIfAuth>
         } />
 
-        {/* Super Admin — the Founders' Console (BUILT) */}
-        <Route path="/super-admin/*" element={
-          <RequireAuth><SuperAdminRoute /></RequireAuth>
-        } />
+        {/* Public — hospital self-registration (no account yet) */}
+        <Route path="/register" element={<RegisterScreen />} />
 
-        {/* Hospital Admin — the account a SuperAdmin creates (BUILT) */}
+        {/* Hospital Admin — the account a hospital signs in with */}
         <Route path="/admin/*" element={
           <RequireAuth><HospitalAdminRoute /></RequireAuth>
         } />
@@ -130,9 +107,6 @@ export default function AppRoutes() {
         } />
         <Route path="/lab/*" element={
           <RequireAuth><LabTechRoute /></RequireAuth>
-        } />
-        <Route path="/patient/*" element={
-          <RequireAuth><PatientRoute /></RequireAuth>
         } />
 
         {/* 404 → Sign-In */}
