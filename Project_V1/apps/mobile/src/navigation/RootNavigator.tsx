@@ -1,0 +1,56 @@
+/**
+ * ============================================================================
+ *  RootNavigator — Mobile
+ * ============================================================================
+ *  Top-level navigation logic:
+ *    - Not signed in     → SignInScreen
+ *    - Signed in          → role-based portal navigator (placeholder for now)
+ *
+ *  When auth state flips, the entire navigator re-renders, so there's no
+ *  manual `replace`/`reset` plumbing needed.
+ * ============================================================================
+ */
+import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { NavigationContainer }     from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useAuth, useTheme }   from '../components/AppContexts';
+import SignInScreen            from '../screens/SignInScreen';
+import PortalPlaceholderScreen from '../screens/PortalPlaceholderScreen';
+
+// Param-list types for type-safe navigation. Each phase will add to these.
+export type AuthStackParamList = { SignIn: undefined; Home: undefined };
+export type AppStackParamList  = { Home: undefined };
+
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const AppStack  = createNativeStackNavigator<AppStackParamList>();
+
+export default function RootNavigator() {
+  const { user, ready } = useAuth();
+  const { theme }       = useTheme();
+
+  // Brief splash while we hydrate persisted auth from AsyncStorage.
+  if (!ready) {
+    return (
+      <View style={{ flex:1, alignItems:'center', justifyContent:'center', backgroundColor: theme.bg }}>
+        <ActivityIndicator color={theme.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      {user
+        ? (
+          <AppStack.Navigator screenOptions={{ headerShown: false }}>
+            <AppStack.Screen name="Home" component={PortalPlaceholderScreen} />
+          </AppStack.Navigator>
+        )
+        : (
+          <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+            <AuthStack.Screen name="SignIn" component={SignInScreen} />
+          </AuthStack.Navigator>
+        )}
+    </NavigationContainer>
+  );
+}

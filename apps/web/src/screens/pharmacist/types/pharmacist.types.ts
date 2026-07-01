@@ -12,7 +12,8 @@ export type ScreenId =
   | 'inventory'    // Inventory
   | 'purchase'     // Purchase Orders
   | 'suppliers'    // Suppliers
-  | 'reports';     // Reports
+  | 'reports'      // Reports
+  | 'settings';    // Settings (Profile + Billing & plans)
 
 export type StatusColor = 'primary' | 'amber' | 'rose' | 'blue' | 'purple' | 'green' | 'gray';
 
@@ -100,3 +101,70 @@ export const NEXT_STATUS: Record<RxStatus, RxStatus> = {
 export const ACTION_LABEL: Record<RxStatus, string> = {
   Pending: 'Start Verification', Verifying: 'Mark Ready', Ready: 'Dispense', Dispensed: 'Completed',
 };
+
+/* ============================================================================
+   SETTINGS — Profile + Billing & plans  (appended block — Settings section)
+   Mirrors the Hospital Admin settings/billing model surfaced inside
+   Settings › Billing & plans. New names only · no existing types touched.
+   ============================================================================ */
+export type PlanTier      = 'pilot' | 'core' | 'scale' | 'enterprise';
+export type PhSettingsTab = 'profile' | 'billing';
+export type SubStatus     = 'Active' | 'New' | 'Cancelled';
+
+export interface PhRegLicense  { name: string; no: string; valid: string; }
+export interface PhRegDocument { name: string; size: string; kind: string; }
+
+/** Full "submitted at registration" record for THIS hospital. Read-only. */
+export interface PhHospitalProfile {
+  // Hospital details
+  legalName: string;
+  facilityType: string;
+  beds: number;
+  established: string;
+  addressLine: string;
+  city: string;
+  state: string;        // full name (e.g. "Telangana")
+  pincode: string;
+  gstin: string;
+  pan: string;
+  cea: string;
+  // Contact information
+  contactName: string;
+  designation: string;
+  email: string;
+  phone: string;
+  altPhone: string;
+  // Compliance
+  licenses: PhRegLicense[];
+  documents: PhRegDocument[];
+}
+
+/** A subscription tier card shown in Billing & plans. */
+export interface PhPlanCard {
+  id: PlanTier;
+  name: string;
+  price: string;        // display: "Free" / "₹24,000" / "Custom"
+  cadence: string;      // "30-day trial" / "/month" / "/contact us"
+  priceValue: number | null;   // numeric amount for payment; null ⇒ contact sales
+  tagline: string;
+  seats: string;        // e.g. "Up to 40 staff seats" / "Unlimited seats"
+  popular?: boolean;
+  features: string[];
+}
+
+/** Live subscription state for THIS hospital. */
+export interface PhSubscription {
+  plan: PlanTier;
+  status: SubStatus;
+  startedOn: string;    // "12 Apr 2026"
+  validUntil: string;   // "11 May 2026"
+}
+
+/** An invoice received by THIS hospital for a plan purchase. */
+export interface PhInvoice {
+  id: string;
+  plan: PlanTier;
+  amount: string;       // "₹62,000"
+  date: string;         // "24 Jun 2026"
+  status: 'paid' | 'failed';
+}

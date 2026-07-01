@@ -1,7 +1,7 @@
 export type ModuleId =
   | 'dashboard' | 'patients' | 'appointments' | 'emr'
   | 'pharmacy'  | 'lab'      | 'inventory'    | 'analytics'
-  | 'notifications' | 'staff' | 'reviews';
+  | 'notifications' | 'staff' | 'reviews' | 'settings';
 
 export type StatusColor = 'primary' | 'amber' | 'rose' | 'blue' | 'purple' | 'green' | 'gray';
 export type StaffRole   = 'Doctor' | 'Receptionist' | 'Pharmacist' | 'LabTech';
@@ -51,3 +51,72 @@ export interface PatientReview {
   };
 }
 export interface HospitalAdminScreenProps { adminName?: string; onSignOut?: () => void; }
+
+/* ============================================================================
+   SETTINGS · PROFILE + BILLING & PLANS  (added — Settings section)
+   ----------------------------------------------------------------------------
+   These mirror what the hospital submitted to the Super Admin at registration
+   (Hospital details, Contact, Licenses, Documents) plus the subscription /
+   billing model surfaced inside Settings › Billing & plans.
+   ============================================================================ */
+export type PlanTier      = 'pilot' | 'core' | 'scale' | 'enterprise';
+export type HaSettingsTab = 'profile' | 'billing';
+export type SubStatus     = 'Active' | 'New' | 'Cancelled';
+
+export interface HaRegLicense  { name: string; no: string; valid: string; }
+export interface HaRegDocument { name: string; size: string; kind: string; }
+
+/** Full "submitted at registration" record for THIS hospital. Read-only. */
+export interface HaHospitalProfile {
+  // Hospital details
+  legalName: string;
+  facilityType: string;
+  beds: number;
+  established: string;
+  addressLine: string;
+  city: string;
+  state: string;        // full name (e.g. "Telangana")
+  pincode: string;
+  gstin: string;
+  pan: string;
+  cea: string;
+  // Contact information
+  contactName: string;
+  designation: string;
+  email: string;
+  phone: string;
+  altPhone: string;
+  // Compliance
+  licenses: HaRegLicense[];
+  documents: HaRegDocument[];
+}
+
+/** A subscription tier card shown in Billing & plans. */
+export interface HaPlanCard {
+  id: PlanTier;
+  name: string;
+  price: string;        // display: "Free" / "₹24,000" / "Custom"
+  cadence: string;      // "30-day trial" / "/month" / "/contact us"
+  priceValue: number | null;   // numeric amount for payment; null ⇒ contact sales
+  tagline: string;
+  seats: string;        // e.g. "Up to 40 staff seats" / "Unlimited seats"
+  popular?: boolean;
+  features: string[];
+}
+
+/** Live subscription state for THIS hospital. */
+export interface HaSubscription {
+  plan: PlanTier;
+  status: SubStatus;
+  startedOn: string;    // "12 Apr 2026"
+  validUntil: string;   // "11 May 2026"
+}
+
+/** An invoice received by THIS hospital for a plan purchase. */
+export interface HaInvoice {
+  id: string;
+  plan: PlanTier;
+  amount: string;       // "₹62,000"
+  date: string;         // "24 Jun 2026"
+  status: 'paid' | 'failed';
+}
