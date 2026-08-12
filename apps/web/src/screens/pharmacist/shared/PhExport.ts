@@ -1,3 +1,4 @@
+import { pulseFor } from '../../../components/pulseBus';
 /**
  * PhExport.ts — dependency-free file download helpers for the Pharmacist
  * portal Settings section. No npm install required (works with the manual
@@ -9,6 +10,7 @@
  */
 
 export function triggerDownload(blob: Blob, filename: string): void {
+  pulseFor(600, 'Preparing download');
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;

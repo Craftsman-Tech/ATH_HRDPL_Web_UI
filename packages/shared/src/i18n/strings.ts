@@ -19,13 +19,13 @@ export type LangCode = 'en' | 'hi' | 'te';
 const en = {
   signIn: {
     welcome:    'Welcome back',
-    heading:    'Sign in to Vexoo',
+    heading:    'Sign in to Vexoo One',
     sub:        'Choose your role and enter your credentials to continue.',
     role:       'Your role',
     email:      'Email',
     password:   'Password',
     forgot:     'Forgot?',
-    signin:     'Sign in to Vexoo',
+    signin:     'Sign in to Vexoo One',
     demo:       'Demo mode · any password unlocks the matched email.',
     invalid:    "Those credentials don't match any account.",
     tagline1:   'Calm software for busy clinics',
@@ -84,13 +84,13 @@ const en = {
 const hi: typeof en = {
   signIn: {
     welcome:    'वापसी पर स्वागत है',
-    heading:    'Vexoo में साइन इन करें',
+    heading:    'Vexoo One में साइन इन करें',
     sub:        'जारी रखने के लिए अपनी भूमिका चुनें और अपने क्रेडेंशियल दर्ज करें।',
     role:       'आपकी भूमिका',
     email:      'ईमेल',
     password:   'पासवर्ड',
     forgot:     'भूल गए?',
-    signin:     'Vexoo में साइन इन करें',
+    signin:     'Vexoo One में साइन इन करें',
     demo:       'डेमो मोड · कोई भी पासवर्ड मेल खाते ईमेल को अनलॉक करता है।',
     invalid:    'ये क्रेडेंशियल किसी भी खाते से मेल नहीं खाते।',
     tagline1:   'व्यस्त क्लीनिकों के लिए शांत सॉफ्टवेयर',
@@ -144,13 +144,13 @@ const hi: typeof en = {
 const te: typeof en = {
   signIn: {
     welcome:    'తిరిగి స్వాగతం',
-    heading:    'Vexoo లోకి సైన్ ఇన్ చేయండి',
+    heading:    'Vexoo One లోకి సైన్ ఇన్ చేయండి',
     sub:        'కొనసాగించడానికి మీ పాత్రను ఎంచుకుని, మీ వివరాలను నమోదు చేయండి.',
     role:       'మీ పాత్ర',
     email:      'ఇమెయిల్',
     password:   'పాస్‌వర్డ్',
     forgot:     'మరిచిపోయారా?',
-    signin:     'Vexoo లోకి సైన్ ఇన్ చేయండి',
+    signin:     'Vexoo One లోకి సైన్ ఇన్ చేయండి',
     demo:       'డెమో మోడ్ · ఏదైనా పాస్‌వర్డ్ సరిపోయే ఇమెయిల్‌ను అన్‌లాక్ చేస్తుంది.',
     invalid:    'ఈ వివరాలు ఏ ఖాతాకూ సరిపోలడం లేదు.',
     tagline1:   'రద్దీగా ఉన్న క్లినిక్‌ల కోసం ప్రశాంతమైన సాఫ్ట్‌వేర్',

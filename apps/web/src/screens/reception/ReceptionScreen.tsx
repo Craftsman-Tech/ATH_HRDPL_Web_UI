@@ -18,6 +18,7 @@ import { QueueManagement }    from './screens/QueueManagement';
 import { BillingPayments }    from './screens/BillingPayments';
 import { Reports }            from './screens/Reports';
 import { Communication }      from './screens/Communication';
+import { pulseFor } from '../../components/pulseBus';
 
 export default function ReceptionScreen({ receptionistName = 'Anita Sharma', onSignOut }: ReceptionScreenProps) {
   const [screen, setScreen]     = useState<ScreenId>('dashboard');
@@ -80,7 +81,7 @@ export default function ReceptionScreen({ receptionistName = 'Anita Sharma', onS
     return () => clearInterval(id);
   }, []);
 
-  const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); }, []);
+  const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); pulseFor(420, 'Loading module'); }, []);
 
   const navWithBadges = useMemo(() => NAV.map(n => {
     if (n.id === 'appointments') {

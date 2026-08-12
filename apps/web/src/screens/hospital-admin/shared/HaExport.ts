@@ -1,3 +1,4 @@
+import { pulseFor } from '../../../components/pulseBus';
 /**
  * HaExport.ts — dependency-free file download helpers for the Hospital Admin
  * portal. No npm install required (works with the manual Ctrl+A → paste flow).
@@ -7,6 +8,7 @@
  */
 
 export function triggerDownload(blob: Blob, filename: string): void {
+  pulseFor(600, 'Preparing download');
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;

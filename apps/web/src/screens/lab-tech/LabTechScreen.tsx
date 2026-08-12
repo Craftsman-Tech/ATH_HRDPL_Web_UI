@@ -34,6 +34,7 @@ import { Inventory } from './screens/Inventory';
 import { Equipment } from './screens/Equipment';
 import { Reports } from './screens/Reports';
 import { Settings } from './screens/Settings';
+import { pulseFor } from '../../components/pulseBus';
 
 /* ------------------------------------------------------------------ *
  *  Inner app — lives inside <LabProvider>, so it can read live store
@@ -51,7 +52,7 @@ function LabApp({ onSignOut }: { onSignOut?: () => void }) {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); }, []);
+  const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); pulseFor(420, 'Loading module'); }, []);
 
   // Live badges sourced from the shared store so they update as orders flow.
   const navWithBadges: NavItem[] = useMemo(() => NAV.map(n => {

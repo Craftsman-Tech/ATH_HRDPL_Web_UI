@@ -31,6 +31,7 @@ import { PurchaseOrders } from './screens/PurchaseOrders';
 import { Suppliers } from './screens/Suppliers';
 import { Reports } from './screens/Reports';
 import { Settings } from './screens/Settings';
+import { pulseFor } from '../../components/pulseBus';
 
 export default function PharmacistScreen({
   pharmacistName = 'Maria Perez',
@@ -66,6 +67,7 @@ export default function PharmacistScreen({
     setInvFilter(s === 'inventory' ? filter : undefined);
     setScreen(s);
     setMobileOpen(false);
+    pulseFor(420, 'Loading module');
   }, []);
 
   const handleNav = useCallback((s: ScreenId) => goTo(s), [goTo]);

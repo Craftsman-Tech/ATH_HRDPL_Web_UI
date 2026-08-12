@@ -1,3 +1,4 @@
+import { pulseFor } from '../../../components/pulseBus';
 /**
  * LtExport.ts — dependency-free file download helpers for the Lab Technician
  * portal Settings section. No npm install required (works with the manual
@@ -11,6 +12,7 @@
  */
 
 export function triggerDownload(blob: Blob, filename: string): void {
+  pulseFor(600, 'Preparing download');
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;

@@ -2,6 +2,7 @@ import React from 'react';
 import type { ScreenId } from '../types/pharmacist.types';
 import { NAV } from '../data/mockPharmData';
 import { SvgIcon, initials } from '../shared/PhHelpers';
+import { VexooGlyph } from '../../../components/VexooMark';
 
 export const Sidebar: React.FC<{
   active: ScreenId; onNav: (s: ScreenId) => void;
@@ -13,11 +14,9 @@ export const Sidebar: React.FC<{
     <nav className={`ph-sidebar ${collapsed ? 'collapsed' : 'expanded'} ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="ph-logo-row">
         <div className="ph-logo-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z" />
-          </svg>
+          <VexooGlyph size={20} />
         </div>
-        {!collapsed && <span className="ph-logo-text">Vexoo</span>}
+        {!collapsed && <span className="ph-logo-text">Vexoo One</span>}
         <button className="ph-collapse-btn" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
           <SvgIcon path={collapsed ? 'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z' : 'M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z'} size={14} color="white" />
         </button>

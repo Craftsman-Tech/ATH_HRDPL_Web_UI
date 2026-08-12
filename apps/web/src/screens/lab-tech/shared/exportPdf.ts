@@ -1,3 +1,4 @@
+import { pulseFor } from '../../../components/pulseBus';
 // ============================================================================
 //  exportPdf.ts — dependency-free PDF (.pdf) generation + print
 // ============================================================================
@@ -79,6 +80,8 @@ export function buildReportPdf(
 
 /** Trigger a browser download of a PDF blob. */
 export function downloadPdf(filename: string, blob: Blob): void {
+  pulseFor(600, 'Preparing download');
+  pulseFor(600, 'Preparing download');
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -98,6 +101,8 @@ const htmlEsc = (s: string): string =>
  * Choosing "Save as PDF" in the dialog prints the report to PDF.
  */
 export function printReport(title: string, subtitle: string, fields: ReportField[]): void {
+  pulseFor(600, 'Opening print view');
+  pulseFor(700, 'Preparing report');
   const rows = fields
     .map(f => `<tr><th>${htmlEsc(f.label)}</th><td>${htmlEsc(f.value)}</td></tr>`)
     .join('');

@@ -1,9 +1,11 @@
 {
   "expo": {
-    "name": "Vexoo",
+    "name": "Vexoo One",
     "slug": "vexoo",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "jsEngine": "hermes",
     "userInterfaceStyle": "automatic",
     "splash": {
       "resizeMode": "contain",
@@ -15,12 +17,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1c2537"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0E7C66"
       },
       "package": "com.vexoo.app"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
     },
     "plugins": ["expo-font"]
   }

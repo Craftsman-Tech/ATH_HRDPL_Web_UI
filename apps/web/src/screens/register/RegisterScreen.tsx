@@ -35,6 +35,8 @@ import { ContactStep } from './components/ContactStep';
 import { LicenseStep } from './components/LicenseStep';
 import { RegisterSuccess } from './components/RegisterSuccess';
 
+import { VexooGlyph } from '../../components/VexooMark';
+
 import type {
   DocId,
   RegistrationForm,
@@ -102,9 +104,9 @@ export default function RegisterScreen() {
   const Bar = (
     <div className="vxreg-bar">
       <div className="vxreg-brand">
-        <div className="vxreg-mark"><Icon d="M22 12h-4l-3 9L9 3l-3 9H2" size={18} sw={2.2} /></div>
+        <div className="vxreg-mark"><VexooGlyph size={19} /></div>
         <div>
-          <div className="vxreg-word">Vexoo<span className="ath">ATH</span></div>
+          <div className="vxreg-word">Vexoo One<span className="ath">ATH</span></div>
           <div className="vxreg-sub">Hospital registration</div>
         </div>
       </div>

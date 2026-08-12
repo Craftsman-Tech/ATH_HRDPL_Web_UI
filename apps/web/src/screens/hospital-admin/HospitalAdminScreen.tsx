@@ -31,6 +31,7 @@ import { NotificationsModule } from './screens/Notifications';
 import { StaffScreen } from './screens/Staff';
 import { ReviewsModule } from './screens/Reviews';
 import { SettingsScreen } from './screens/Settings';
+import { pulseFor } from '../../components/pulseBus';
 
 export default function HospitalAdminScreen({
   adminName = 'Anita Reddy',
@@ -58,6 +59,7 @@ export default function HospitalAdminScreen({
 
   const handleNav = useCallback((m: ModuleId) => {
     setModule(m); setMobileOpen(false);
+    pulseFor(420, 'Loading module');
   }, []);
 
   const moduleEl = useMemo(() => {

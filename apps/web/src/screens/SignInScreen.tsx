@@ -18,6 +18,7 @@ import type { Role, LangCode } from '@vexoo/shared';
 import { useAuth }  from '../components/AuthContext';
 import { useTheme, useLang } from '../components/ThemeContext';
 import '../styles/signin.css';
+import { VexooGlyph } from '../components/VexooMark';
 
 // Role list — order and demo-email mapping matches the original.
 const ROLES: { id: Role; demoEmail: string }[] = [
@@ -185,10 +186,10 @@ export default function SignInScreen() {
 
         <header className="brand-inner brand-logo">
           <div className="brand-logo-mark">
-            <Icon size={20} d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            <VexooGlyph size={21} />
           </div>
           <div>
-            <div className="brand-logo-text">Vexoo</div>
+            <div className="brand-logo-text">Vexoo One</div>
             <div className="brand-logo-sub">{t.signIn.estLine}</div>
           </div>
         </header>

@@ -1,3 +1,4 @@
+import { pulseFor } from '../../../components/pulseBus';
 // ============================================================================
 //  exportXlsx.ts — Vexoo Pharmacist Portal
 //  Dependency-free Excel export. Produces a SpreadsheetML 2003 (.xls) workbook
@@ -29,6 +30,7 @@ export function exportToExcel(
   headers: string[],
   rows: Cell[][],
 ): void {
+  pulseFor(600, 'Preparing spreadsheet');
   const headerCells = headers
     .map(h => `<Cell ss:StyleID="hdr"><Data ss:Type="String">${escXml(h)}</Data></Cell>`)
     .join('');

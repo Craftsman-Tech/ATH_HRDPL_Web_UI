@@ -6,6 +6,7 @@
 // ============================================================================
 
 import type { CompletedRx } from '../types/pharmacist.types';
+import { pulseFor } from '../../../components/pulseBus';
 
 // Escape characters that are special inside a PDF text string.
 function pdfEsc(s: string): string {
@@ -82,6 +83,8 @@ function download(pdfStr: string, filename: string): void {
 
 /** Compose a completed prescription into a downloadable, non-editable PDF. */
 export function downloadPrescriptionPdf(rx: CompletedRx): void {
+  pulseFor(600, 'Preparing prescription');
+  pulseFor(600, 'Preparing prescription');
   const L: Line[] = [];
   const R: Rule[] = [];
   const left = 56;

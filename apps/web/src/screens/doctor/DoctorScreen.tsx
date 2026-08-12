@@ -20,6 +20,7 @@ import { Queue } from './screens/Queue';
 import { Patients } from './screens/Patients';
 import { Messages } from './screens/Messages';
 import { Schedule } from './screens/Schedule';
+import { pulseFor } from '../../components/pulseBus';
 
 const SCREEN_TITLES: Record<ScreenId, string> = {
   queue: "Today's Queue", patients: 'My Patients', messages: 'Messages', schedule: 'My Schedule',
@@ -56,7 +57,7 @@ export default function DoctorScreen({ doctorName = 'Dr. Meera Sharma', onSignOu
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); }, []);
+  const handleNav = useCallback((s: ScreenId) => { setScreen(s); setMobile(false); pulseFor(420, 'Loading module'); }, []);
 
   const navWithBadges: NavItem[] = useMemo(() => NAV.map(n => {
     if (n.id === 'queue') {

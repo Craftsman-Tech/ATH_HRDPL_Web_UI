@@ -1,3 +1,4 @@
+import { pulseFor } from '../../../components/pulseBus';
 // ============================================================================
 //  exportExcel.ts — dependency-free Excel (.xls) export
 // ============================================================================
@@ -29,6 +30,7 @@ export function exportExcel(
   rows: (string | number)[][],
   sheetName = 'Report',
 ): void {
+  pulseFor(600, 'Preparing spreadsheet');
   const headerCells = headers
     .map(h => `<Cell ss:StyleID="hdr"><Data ss:Type="String">${esc(h)}</Data></Cell>`)
     .join('');

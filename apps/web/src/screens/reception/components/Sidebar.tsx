@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ScreenId, NavItem } from '../types/reception.types';
 import { initials } from '../shared/initials';
+import { VexooGlyph } from '../../../components/VexooMark';
 
 interface SidebarProps {
   active: ScreenId;
@@ -24,12 +25,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ active, onNav, mobileOpen, rec
     <aside className={`rc-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="rc-logo-row">
         <div className="rc-logo-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/>
-          </svg>
+          <VexooGlyph size={20} />
         </div>
         <div>
-          <div style={{ color:'white', fontWeight:900, fontSize:16, letterSpacing:'-0.3px' }}>Vexoo</div>
+          <div style={{ color:'white', fontWeight:900, fontSize:16, letterSpacing:'-0.3px' }}>Vexoo One</div>
           <div style={{ color:'rgba(255,255,255,0.38)', fontSize:10, fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase' }}>Reception Portal</div>
         </div>
       </div>
