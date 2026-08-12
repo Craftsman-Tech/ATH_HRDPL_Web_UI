@@ -47,7 +47,7 @@ export default function PortalPlaceholderScreen() {
 
 const styles = StyleSheet.create({
   eyebrow:  { fontSize: fontSize.xs, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '600' },
-  heading:  { fontFamily: 'Fraunces', fontSize: fontSize.h2, marginTop: spacing.sm },
+  heading:  { fontSize: fontSize.h2, marginTop: spacing.sm },
   body:     { fontSize: fontSize.md, lineHeight: 22, marginTop: spacing.md },
   card:     {
     marginTop: spacing.xxl, padding: spacing.lg,

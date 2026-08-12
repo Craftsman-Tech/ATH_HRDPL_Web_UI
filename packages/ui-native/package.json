@@ -1,0 +1,16 @@
+{
+  "name": "@vexoo/ui-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React Native presentation layer shared across Vexoo mobile apps. Never imported by apps/web — it depends on react-native.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "@vexoo/shared": "*",
+    "expo-linear-gradient": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-reanimated": "*",
+    "react-native-svg": "*"
+  }
+}
