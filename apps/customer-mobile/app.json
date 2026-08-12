@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Vexoo",
+    "slug": "vexoo-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "scheme": "vexoo-customer",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vexoo.customer",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Vexoo needs access to your photos so you can attach health documents and reports.",
+        "NSCameraUsageDescription": "Vexoo needs camera access so you can photograph prescriptions and reports."
+      }
+    },
+    "android": {
+      "package": "com.vexoo.customer",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-background.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#0E7C66"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140,
+          "resizeMode": "contain",
+          "backgroundColor": "#0B0F0E"
+        }
+      ]
+    ]
+  }
+}

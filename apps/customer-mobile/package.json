@@ -1,0 +1,40 @@
+{
+  "name": "@vexoo/customer-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vexoo/shared": "*",
+    "@vexoo/ui-native": "*",
+    "expo": "57.0.12",
+    "expo-font": "~57.0.1",
+    "expo-linear-gradient": "~57.0.1",
+    "expo-secure-store": "~57.0.1",
+    "expo-splash-screen": "~57.0.6",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.2.0",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "typescript": "~5.9.2",
+    "@react-native/babel-preset": "0.86.2",
+    "babel-preset-expo": "~57.0.6"
+  },
+  "//": "babel-preset-expo and @react-native/babel-preset are declared explicitly, not left to hoisting. apps/mobile is still on Expo SDK 51, so the monorepo root holds babel-preset-expo@11 / @react-native/babel-preset@0.74 — and babel.config.js resolves from the app upward, which would otherwise parse React Native 0.86 source with the 0.74 preset and fail on VirtualViewExperimentalNativeComponent. Remove these once apps/mobile is on SDK 57 too."
+}

@@ -10,8 +10,7 @@
  * ============================================================================
  */
 import React from 'react';
-import { View, ActivityIndicator, StatusBar } from 'react-native';
-import { useFonts }              from 'expo-font';
+import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider }       from 'react-native-safe-area-context';
 import {
@@ -36,19 +35,6 @@ export default function App() {
   // Load fonts up-front — the brand depends on Fraunces + Plus Jakarta.
   // For Phase 1 we reference Google's hosted ttf files; in production you'd
   // bundle them locally for offline support.
-  const [fontsLoaded] = useFonts({
-    'PlusJakartaSans': 'https://fonts.gstatic.com/s/plusjakartasans/v8/LDIbaomQNQcsA88c7O9yZ4KMCoOg4Ko4iKw.ttf',
-    'Fraunces':        'https://fonts.gstatic.com/s/fraunces/v33/6NUh8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk.ttf',
-  });
-
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex:1, alignItems:'center', justifyContent:'center', backgroundColor:'#1c2537' }}>
-        <ActivityIndicator color="#5bd4bc" />
-      </View>
-    );
-  }
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

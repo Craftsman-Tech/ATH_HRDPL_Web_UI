@@ -26,7 +26,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,6 +41,7 @@ const ROLES: { id: Role; demoEmail: string }[] = [
   { id: 'Doctor',       demoEmail: 'doctor@vexoo.in'    },
   { id: 'Receptionist', demoEmail: 'reception@vexoo.in' },
   { id: 'Pharmacist',   demoEmail: 'pharmacy@vexoo.in'  },
+  { id: 'LabTech',      demoEmail: 'lab@vexoo.in'       },
 ];
 
 const ROLE_ICON_PATHS: Record<Role, string> = {
@@ -61,7 +62,7 @@ const ROLE_ACCENTS: Record<Role, string> = {
 
 // Navigation prop shape (loose typing — replace with proper RootStackParamList
 // once we wire up the typed nav in Phase 2).
-type Props = { navigation: { replace: (screen: string) => void } };
+type Props = { navigation: { replace: (screen: string) => void; navigate: (screen: string) => void } };
 
 export default function SignInScreen({ navigation }: Props) {
   const { signIn }       = useAuth();
@@ -73,6 +74,17 @@ export default function SignInScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [err,      setErr]      = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportSent, setSupportSent] = useState(false);
+  const [supportMode, setSupportMode] = useState<'help' | 'forgot' | 'register'>('help');
+  const [supportForm, setSupportForm] = useState({
+    name: '',
+    phone: '',
+    email: 'reception@vexoo.in',
+    hospital: '',
+    message: '',
+  });
 
   // Same pickRole behavior as web — auto-fills the demo email.
   const pickRole = (r: Role) => {
@@ -82,8 +94,33 @@ export default function SignInScreen({ navigation }: Props) {
     setErr('');
   };
 
+  const openSupport = (mode: 'help' | 'forgot' | 'register') => {
+    setSupportMode(mode);
+    setSupportSent(false);
+    setSupportForm((f) => ({
+      ...f,
+      email,
+      message: mode === 'forgot'
+        ? `I need help resetting access for ${email}.`
+        : mode === 'register'
+          ? 'We want to register a new hospital/clinic with Vexoo.'
+          : f.message,
+    }));
+    setSupportOpen(true);
+  };
+
+  const submitSupport = () => {
+    if (!supportForm.name.trim() || !supportForm.message.trim()) {
+      setErr('Enter your name and message before submitting support request.');
+      return;
+    }
+    setErr('');
+    setSupportSent(true);
+  };
+
   const onSubmit = async () => {
     setErr('');
+    if (!email.trim()) { setErr('Enter email address.'); return; }
     setLoading(true);
     await new Promise(r => setTimeout(r, 600));
     const u = await signIn(email, password, role);
@@ -178,6 +215,14 @@ export default function SignInScreen({ navigation }: Props) {
             );
           })}
         </ScrollView>
+        <View style={s.demoCards}>
+          {ROLES.map(r => (
+            <TouchableOpacity key={r.id} style={s.demoCard} onPress={() => pickRole(r.id)}>
+              <Text style={s.demoRole}>{t.roles[r.id]}</Text>
+              <Text style={s.demoEmail}>{r.demoEmail}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Email */}
         <Text style={[s.label, { marginTop: spacing.lg }]}>{t.signIn.email}</Text>
@@ -195,16 +240,19 @@ export default function SignInScreen({ navigation }: Props) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between',
                        alignItems: 'flex-end', marginTop: spacing.lg, marginBottom: spacing.sm }}>
           <Text style={s.label}>{t.signIn.password}</Text>
-          <TouchableOpacity><Text style={s.forgot}>{t.signIn.forgot}</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => openSupport('forgot')}><Text style={s.forgot}>{t.signIn.forgot}</Text></TouchableOpacity>
         </View>
         <TextInput
           style={s.input}
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
+          secureTextEntry={!showPassword}
           placeholder="••••••••"
           placeholderTextColor={theme.textMuted}
         />
+        <TouchableOpacity style={s.passwordToggleStandalone} onPress={() => setShowPassword(v => !v)}>
+          <Text style={s.passwordToggleText}>{showPassword ? 'Hide password' : 'Show password'}</Text>
+        </TouchableOpacity>
 
         {/* Submit */}
         <TouchableOpacity style={[s.submit, loading && { opacity: 0.6 }]}
@@ -240,11 +288,77 @@ export default function SignInScreen({ navigation }: Props) {
 
         {/* Footer */}
         <View style={s.footer}>
-          <Text style={s.footerText}>
-            {t.signIn.newClinic} <Text style={{ color: theme.primary }}>{t.signIn.register}</Text>
-          </Text>
+          <TouchableOpacity style={s.footerAction} onPress={() => navigation.navigate('Register')}>
+            <Text style={s.footerText}>
+              {t.signIn.newClinic} <Text style={{ color: theme.primary }}>{t.signIn.register}</Text>
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.helpAction} onPress={() => openSupport('help')}>
+            <Text style={s.helpActionText}>{t.signIn.help} Vexoo Customer Support</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
+      <Modal transparent visible={supportOpen} animationType="slide" onRequestClose={() => setSupportOpen(false)}>
+        <View style={s.modalRoot}>
+          <Pressable style={s.modalBackdrop} onPress={() => setSupportOpen(false)} />
+          <View style={s.supportSheet}>
+            <View style={s.supportHead}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.supportTitle}>{supportMode === 'register' ? 'Register Hospital' : supportMode === 'forgot' ? 'Reset Access' : 'Vexoo Customer Support'}</Text>
+                <Text style={s.supportSub}>{supportMode === 'register' ? 'Send your clinic details and onboarding team will contact you.' : 'Tell us what is blocking your sign-in.'}</Text>
+              </View>
+              <TouchableOpacity style={s.supportClose} onPress={() => setSupportOpen(false)}>
+                <Text style={s.supportCloseText}>X</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={s.supportBody}>
+              {supportSent ? (
+                <View style={s.successBox}>
+                  <Text style={s.successTitle}>Message Sent Successfully</Text>
+                  <Text style={s.successText}>Our team will reach out soon using the details you provided.</Text>
+                  <TouchableOpacity style={s.submit} onPress={() => setSupportOpen(false)}>
+                    <Text style={s.submitText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <Text style={s.label}>Full Name</Text>
+                  <TextInput style={s.input} value={supportForm.name} onChangeText={(name) => setSupportForm((f) => ({ ...f, name }))} placeholder="Your name" placeholderTextColor={theme.textMuted} />
+                  <Text style={s.label}>Phone</Text>
+                  <TextInput style={s.input} value={supportForm.phone} onChangeText={(phone) => setSupportForm((f) => ({ ...f, phone }))} placeholder="+91 ..." placeholderTextColor={theme.textMuted} keyboardType="phone-pad" />
+                  <Text style={s.label}>Email</Text>
+                  <TextInput style={s.input} value={supportForm.email} onChangeText={(value) => setSupportForm((f) => ({ ...f, email: value }))} placeholder="you@example.com" placeholderTextColor={theme.textMuted} keyboardType="email-address" autoCapitalize="none" />
+                  {supportMode === 'register' ? (
+                    <>
+                      <Text style={s.label}>Hospital / Clinic Name</Text>
+                      <TextInput style={s.input} value={supportForm.hospital} onChangeText={(hospital) => setSupportForm((f) => ({ ...f, hospital }))} placeholder="Hospital name" placeholderTextColor={theme.textMuted} />
+                    </>
+                  ) : null}
+                  <Text style={s.label}>Role</Text>
+                  <TextInput style={s.input} value={t.roles[role]} editable={false} />
+                  <Text style={s.label}>Message</Text>
+                  <TextInput
+                    style={[s.input, s.messageInput]}
+                    value={supportForm.message}
+                    onChangeText={(message) => setSupportForm((f) => ({ ...f, message }))}
+                    placeholder="Describe the issue or onboarding request"
+                    placeholderTextColor={theme.textMuted}
+                    multiline
+                  />
+                  <View style={s.supportActions}>
+                    <TouchableOpacity style={s.ghostButton} onPress={() => setSupportOpen(false)}>
+                      <Text style={s.ghostButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.supportSubmit} onPress={submitSupport}>
+                      <Text style={s.supportSubmitText}>Submit Request</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -267,7 +381,7 @@ const makeStyles = (theme: ReturnType<typeof useTheme>['theme']) => StyleSheet.c
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
-  logoText:   { fontFamily: 'Fraunces', color: '#fafaf7', fontSize: fontSize.xl, fontWeight: '600' },
+  logoText:   { color: '#fafaf7', fontSize: fontSize.xl, fontWeight: '600' },
   logoSub:    { color: 'rgba(250,250,247,0.55)', fontSize: fontSize.xxs, marginTop: 1 },
   themeBtn:   {
     width: 36, height: 36, borderRadius: radius.md,
@@ -277,14 +391,14 @@ const makeStyles = (theme: ReturnType<typeof useTheme>['theme']) => StyleSheet.c
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#5bd4bc' },
   eyebrowText:{ color: 'rgba(250,250,247,0.65)', fontSize: fontSize.xs, letterSpacing: 1.2, textTransform: 'uppercase' },
-  headline:   { color: '#fafaf7', fontFamily: 'Fraunces', fontSize: 36, lineHeight: 40, marginTop: spacing.md, letterSpacing: -1 },
+  headline:   { color: '#fafaf7', fontSize: 36, lineHeight: 40, marginTop: spacing.md },
   headlineEm: { color: '#5bd4bc', fontStyle: 'italic', fontWeight: '400' },
 
   formScroll: { flex: 1 },
   formContent:{ padding: spacing.xxl, paddingBottom: spacing.xxxl + spacing.xxl },
 
   welcome: { fontSize: fontSize.xs, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '600' },
-  heading: { fontFamily: 'Fraunces', fontSize: fontSize.h2, color: theme.text, marginTop: 4, letterSpacing: -0.8 },
+  heading: { fontSize: fontSize.h2, color: theme.text, marginTop: 4 },
   sub:     { fontSize: fontSize.md, color: theme.textMuted, marginTop: spacing.sm, lineHeight: 20 },
 
   label:   { fontSize: fontSize.sm, fontWeight: '600', color: theme.textMuted, marginTop: spacing.xl, marginBottom: spacing.sm },
@@ -298,6 +412,22 @@ const makeStyles = (theme: ReturnType<typeof useTheme>['theme']) => StyleSheet.c
     borderWidth: 1, borderColor: theme.border,
   },
   roleChipText: { fontSize: fontSize.sm, fontWeight: '600', color: theme.textMuted },
+  demoCards: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  demoCard: {
+    width: '48%',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
+    padding: spacing.md,
+  },
+  demoRole: { color: theme.text, fontSize: fontSize.sm, fontWeight: '700' },
+  demoEmail: { color: theme.textMuted, fontSize: fontSize.xs, marginTop: spacing.xs },
 
   input: {
     backgroundColor: theme.card,
@@ -306,6 +436,8 @@ const makeStyles = (theme: ReturnType<typeof useTheme>['theme']) => StyleSheet.c
     paddingHorizontal: spacing.md, paddingVertical: spacing.md,
     fontSize: fontSize.md, color: theme.text,
   },
+  passwordToggleStandalone: { alignSelf: 'flex-end', paddingTop: spacing.sm },
+  passwordToggleText: { color: theme.primary, fontSize: fontSize.sm, fontWeight: '700' },
 
   submit: {
     marginTop: spacing.xxl,
@@ -333,6 +465,27 @@ const makeStyles = (theme: ReturnType<typeof useTheme>['theme']) => StyleSheet.c
   },
   langBtnText: { fontSize: fontSize.sm, color: theme.textMuted },
 
-  footer: { marginTop: spacing.xl, alignItems: 'center' },
+  footer: { marginTop: spacing.xl, alignItems: 'center', gap: spacing.md },
+  footerAction: { paddingVertical: spacing.xs },
   footerText: { fontSize: fontSize.sm, color: theme.textMuted },
+  helpAction: { borderColor: theme.border, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  helpActionText: { color: theme.primary, fontSize: fontSize.sm, fontWeight: '700' },
+  modalRoot: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { backgroundColor: 'rgba(15,22,35,0.48)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  supportSheet: { backgroundColor: theme.card, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, maxHeight: '88%' },
+  supportHead: { alignItems: 'center', borderBottomColor: theme.border, borderBottomWidth: 1, flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', padding: spacing.xl },
+  supportTitle: { color: theme.text, fontSize: fontSize.lg, fontWeight: '800' },
+  supportSub: { color: theme.textMuted, fontSize: fontSize.sm, lineHeight: 18, marginTop: spacing.xs },
+  supportClose: { alignItems: 'center', borderColor: theme.border, borderRadius: radius.md, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
+  supportCloseText: { color: theme.text, fontSize: fontSize.sm, fontWeight: '800' },
+  supportBody: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  messageInput: { minHeight: 110, textAlignVertical: 'top' },
+  supportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },
+  ghostButton: { alignItems: 'center', backgroundColor: theme.card, borderColor: theme.border, borderRadius: radius.md, borderWidth: 1, flex: 1, minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.lg },
+  ghostButtonText: { color: theme.text, fontSize: fontSize.sm, fontWeight: '700' },
+  supportSubmit: { alignItems: 'center', backgroundColor: theme.primary, borderRadius: radius.md, flex: 1, minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.lg },
+  supportSubmitText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '800' },
+  successBox: { alignItems: 'center', gap: spacing.md, padding: spacing.lg },
+  successTitle: { color: theme.text, fontSize: fontSize.lg, fontWeight: '800', textAlign: 'center' },
+  successText: { color: theme.textMuted, fontSize: fontSize.md, lineHeight: 21, textAlign: 'center' },
 });

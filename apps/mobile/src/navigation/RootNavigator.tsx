@@ -16,10 +16,11 @@ import { NavigationContainer }     from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth, useTheme }   from '../components/AppContexts';
 import SignInScreen            from '../screens/SignInScreen';
-import PortalPlaceholderScreen from '../screens/PortalPlaceholderScreen';
+import RegisterScreen          from '../screens/RegisterScreen';
+import PortalHomeScreen        from '../screens/PortalHomeScreen';
 
 // Param-list types for type-safe navigation. Each phase will add to these.
-export type AuthStackParamList = { SignIn: undefined; Home: undefined };
+export type AuthStackParamList = { SignIn: undefined; Register: undefined; Home: undefined };
 export type AppStackParamList  = { Home: undefined };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -43,12 +44,13 @@ export default function RootNavigator() {
       {user
         ? (
           <AppStack.Navigator screenOptions={{ headerShown: false }}>
-            <AppStack.Screen name="Home" component={PortalPlaceholderScreen} />
+            <AppStack.Screen name="Home" component={PortalHomeScreen} />
           </AppStack.Navigator>
         )
         : (
           <AuthStack.Navigator screenOptions={{ headerShown: false }}>
             <AuthStack.Screen name="SignIn" component={SignInScreen} />
+            <AuthStack.Screen name="Register" component={RegisterScreen} />
           </AuthStack.Navigator>
         )}
     </NavigationContainer>

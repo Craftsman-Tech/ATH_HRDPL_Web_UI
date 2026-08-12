@@ -1,0 +1,20 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@vexoo/shared": ["../../packages/shared/src"],
+      "@vexoo/shared/*": ["../../packages/shared/src/*"],
+      "@vexoo/ui-native": ["../../packages/ui-native/src"],
+      "@vexoo/ui-native/*": ["../../packages/ui-native/src/*"],
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "src",
+    "App.tsx",
+    "../../packages/shared/src",
+    "../../packages/ui-native/src"
+  ]
+}
