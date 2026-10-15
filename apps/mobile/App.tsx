@@ -13,7 +13,11 @@
  * ============================================================================
  */
 import React from 'react';
+<<<<<<< HEAD
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
+=======
+import { StatusBar } from 'react-native';
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider }       from 'react-native-safe-area-context';
 import {
@@ -72,8 +76,14 @@ function AppShell() {
 }
 
 export default function App() {
+<<<<<<< HEAD
   const fontsReady = useBrandFonts();
 
+=======
+  // Load fonts up-front — the brand depends on Fraunces + Plus Jakarta.
+  // For Phase 1 we reference Google's hosted ttf files; in production you'd
+  // bundle them locally for offline support.
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
   return (
     <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>

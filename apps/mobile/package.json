@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
+<<<<<<< HEAD
     "android": "expo run:android",
     "android:online": "expo start --android",
     "ios": "expo run:ios",
@@ -14,6 +15,13 @@
     "@expo-google-fonts/fraunces": "^0.4.1",
     "@expo-google-fonts/inter-tight": "^0.4.2",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
+=======
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/drawer": "^6.7.2",
@@ -21,11 +29,16 @@
     "@react-navigation/native-stack": "^6.11.0",
     "@vexoo/shared": "*",
     "expo": "~51.0.28",
+<<<<<<< HEAD
     "expo-document-picker": "~12.0.2",
     "expo-font": "~12.0.10",
     "expo-linear-gradient": "~13.0.2",
     "expo-print": "~13.0.1",
     "expo-sharing": "~12.0.1",
+=======
+    "expo-font": "~12.0.10",
+    "expo-linear-gradient": "~13.0.2",
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
     "react-native": "0.74.5",

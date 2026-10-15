@@ -20,9 +20,13 @@ import RegisterScreen          from '../screens/RegisterScreen';
 import PortalHomeScreen        from '../screens/PortalHomeScreen';
 
 // Param-list types for type-safe navigation. Each phase will add to these.
+<<<<<<< HEAD
 // `Home` deliberately lives only on the app stack — the auth stack cannot
 // navigate to it, because signing in swaps the whole navigator instead.
 export type AuthStackParamList = { SignIn: undefined; Register: undefined };
+=======
+export type AuthStackParamList = { SignIn: undefined; Register: undefined; Home: undefined };
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 export type AppStackParamList  = { Home: undefined };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();

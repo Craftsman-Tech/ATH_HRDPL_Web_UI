@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
+<<<<<<< HEAD
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,21 @@ import {
   NavDrawer, PillRow, ReadField, SectionHeader, Segmented as UiSegmented,
   SearchField, Sheet as UiSheet, StatTile, Surface, Touchable, pulseFor, toneFor, type IconName,
 } from '../../ui';
+=======
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import { fontSize, fontWeight, palette, radius, spacing } from '@vexoo/shared';
+import { useAuth, useTheme } from '../../components/AppContexts';
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 import {
   HA_APPOINTMENTS,
   HA_EQUIPMENT,
@@ -111,6 +127,7 @@ function shortLabelIso(label: string) {
   return isoDate(new Date(2026, monthIndex[month] ?? 0, Number(day) || 1));
 }
 
+<<<<<<< HEAD
 /* ── Local primitives ──────────────────────────────────────────────────────
    Call signatures are unchanged so every module renderer below stays as it
    was; each now delegates to the shared UI kit, which is where the elevation,
@@ -134,6 +151,15 @@ function buttonIcon(label: string): IconName | undefined {
   if (/reorder|restock/.test(v))                                  return 'package';
   if (/filter/.test(v))                                           return 'filter';
   return undefined;
+=======
+function Chip({ label }: { label: string }) {
+  const color = toneColor(label);
+  return (
+    <View style={[styles.chip, { backgroundColor: `${color}18` }]}>
+      <Text style={[styles.chipText, { color }]}>{label}</Text>
+    </View>
+  );
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 }
 
 function Button({
@@ -145,13 +171,36 @@ function Button({
   onPress: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
 }) {
+<<<<<<< HEAD
   return (
     <UiButton label={label} onPress={onPress} variant={variant} accent={accent} icon={buttonIcon(label)} style={styles.btnGap} />
+=======
+  const { theme } = useTheme();
+  const backgroundColor = variant === 'primary' ? accent : variant === 'danger' ? palette.rose : theme.card;
+  const color = variant === 'ghost' ? theme.text : '#fff';
+  return (
+    <TouchableOpacity
+      style={[styles.button, { backgroundColor, borderColor: variant === 'ghost' ? theme.border : backgroundColor }]}
+      onPress={onPress}
+    >
+      <Text style={[styles.buttonText, { color }]}>{label}</Text>
+    </TouchableOpacity>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
   );
 }
 
 function Field({ label, value }: { label: string; value: string }) {
+<<<<<<< HEAD
   return <ReadField label={label} value={value} />;
+=======
+  const { theme } = useTheme();
+  return (
+    <View style={[styles.field, { borderColor: theme.border, backgroundColor: theme.bg }]}>
+      <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{label}</Text>
+      <Text style={[styles.fieldValue, { color: theme.text }]}>{value}</Text>
+    </View>
+  );
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 }
 
 function Input({
@@ -167,6 +216,7 @@ function Input({
   placeholder?: string;
   multiline?: boolean;
 }) {
+<<<<<<< HEAD
   return (
     <UiField
       label={label}
@@ -177,11 +227,35 @@ function Input({
       accent={accent}
       containerStyle={styles.fieldGap}
     />
+=======
+  const { theme } = useTheme();
+  return (
+    <View style={{ marginBottom: spacing.md }}>
+      <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={theme.textMuted}
+        multiline={multiline}
+        style={[
+          styles.input,
+          multiline && styles.inputMultiline,
+          { backgroundColor: theme.bg, borderColor: theme.border, color: theme.text },
+        ]}
+      />
+    </View>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
   );
 }
 
 function Card({ children }: { children: React.ReactNode }) {
+<<<<<<< HEAD
   return <Surface style={styles.cardGap} radiusSize="xl">{children}</Surface>;
+=======
+  const { theme } = useTheme();
+  return <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>{children}</View>;
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 }
 
 function Section({
@@ -193,11 +267,37 @@ function Section({
   action?: string;
   onAction?: () => void;
 }) {
+<<<<<<< HEAD
   return <SectionHeader title={title} action={action} onAction={onAction} accent={accent} />;
 }
 
 function Stat({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return <StatTile label={label} value={value} detail={sub} color={color} icon={metricIcon(label)} />;
+=======
+  const { theme } = useTheme();
+  return (
+    <View style={styles.sectionRow}>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+      {action ? (
+        <TouchableOpacity disabled={!onAction} onPress={onAction}>
+          <Text style={[styles.sectionAction, { color: accent }]}>{action}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+function Stat({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+  const { theme } = useTheme();
+  return (
+    <View style={[styles.stat, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.statBar, { backgroundColor: color }]} />
+      <Text style={[styles.statLabel, { color: theme.textMuted }]}>{label}</Text>
+      <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
+      <Text style={[styles.statSub, { color: theme.textMuted }]}>{sub}</Text>
+    </View>
+  );
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 }
 
 function Row({
@@ -213,6 +313,7 @@ function Row({
   status?: string;
   onPress?: () => void;
 }) {
+<<<<<<< HEAD
   return (
     <ListRow
       title={title}
@@ -225,6 +326,21 @@ function Row({
 }
 
 /** Two-to-four way switcher with a sliding indicator. */
+=======
+  const { theme } = useTheme();
+  return (
+    <TouchableOpacity disabled={!onPress} onPress={onPress} style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.rowTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.rowSub, { color: theme.textMuted }]} numberOfLines={2}>{subtitle}</Text>
+        <Text style={[styles.rowMeta, { color: theme.textMuted }]}>{meta}</Text>
+      </View>
+      {status ? <Chip label={status} /> : null}
+    </TouchableOpacity>
+  );
+}
+
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 function Segment<T extends string>({
   values,
   active,
@@ -234,11 +350,31 @@ function Segment<T extends string>({
   active: T;
   onChange: (value: T) => void;
 }) {
+<<<<<<< HEAD
   return values.length > 4
     ? <View style={styles.pillWrap}>
         <PillRow options={values.map((v) => ({ value: v.value, label: v.label }))} value={active} onChange={onChange} accent={accent} />
       </View>
     : <UiSegmented options={values.map((v) => ({ value: v.value, label: v.label }))} value={active} onChange={onChange} accent={accent} style={styles.segmentGap} />;
+=======
+  const { theme } = useTheme();
+  return (
+    <View style={[styles.segment, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      {values.map((item) => {
+        const selected = active === item.value;
+        return (
+          <TouchableOpacity
+            key={item.value}
+            onPress={() => onChange(item.value)}
+            style={[styles.segmentItem, selected && { backgroundColor: accent }]}
+          >
+            <Text style={[styles.segmentText, { color: selected ? '#fff' : theme.textMuted }]}>{item.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 }
 
 function Sheet({
@@ -252,7 +388,27 @@ function Sheet({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+<<<<<<< HEAD
   return <UiSheet visible={visible} title={title} onClose={onClose}>{children}</UiSheet>;
+=======
+  const { theme } = useTheme();
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetRoot}>
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: theme.card }]}>
+          <View style={[styles.sheetHead, { borderBottomColor: theme.border }]}>
+            <Text style={[styles.sheetTitle, { color: theme.text }]}>{title}</Text>
+            <TouchableOpacity style={[styles.sheetClose, { borderColor: theme.border }]} onPress={onClose}>
+              <Text style={[styles.sheetCloseText, { color: theme.text }]}>X</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.sheetBody}>{children}</ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 }
 
 function AppliedFilters({
@@ -289,6 +445,7 @@ function ToggleList({
       {items.map((item) => {
         const active = selected.includes(item);
         return (
+<<<<<<< HEAD
           <Touchable
             key={item}
             press="sm"
@@ -302,6 +459,16 @@ function ToggleList({
             </View>
             <Text style={[styles.toggleText, { color: active ? accent : theme.text }]}>{item}</Text>
           </Touchable>
+=======
+          <TouchableOpacity
+            key={item}
+            onPress={() => toggle(item)}
+            style={[styles.toggleItem, { borderColor: active ? accent : theme.border, backgroundColor: active ? palette.primaryLight : theme.bg }]}
+          >
+            <Text style={[styles.toggleMark, { color: active ? accent : theme.textMuted }]}>{active ? 'ON' : '+'}</Text>
+            <Text style={[styles.toggleText, { color: active ? accent : theme.text }]}>{item}</Text>
+          </TouchableOpacity>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
         );
       })}
     </View>
@@ -322,6 +489,7 @@ function Drawer({
   onSignOut: () => void;
 }) {
   const { user } = useAuth();
+<<<<<<< HEAD
   return (
     <NavDrawer
       visible={open}
@@ -367,6 +535,98 @@ function Header({ active, onMenu }: { active: HaModuleId; onMenu: () => void }) 
       showClock
       onMenu={onMenu}
     />
+=======
+  const { theme } = useTheme();
+  return (
+    <Modal transparent visible={open} animationType="fade" onRequestClose={onClose}>
+      <View style={styles.drawerRoot}>
+        <Pressable style={styles.drawerBackdrop} onPress={onClose} />
+        <View style={[styles.drawer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.drawerProfileCard}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.drawerKicker, { color: theme.textMuted }]}>Signed in as</Text>
+              <Text style={[styles.drawerProfileName, { color: theme.text }]}>{user?.name ?? 'Anita Reddy'}</Text>
+              <Text style={[styles.drawerProfileRole, { color: theme.textMuted }]}>Hospital Administrator</Text>
+            </View>
+            <View style={styles.drawerAvatar}>
+              <Text style={styles.drawerAvatarText}>{initials(user?.name ?? 'Anita Reddy')}</Text>
+            </View>
+          </View>
+          <Text style={[styles.drawerTitle, { color: theme.text }]}>Apollo Multispecialty</Text>
+          <ScrollView style={styles.drawerScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.drawerItems}>
+              {HA_MODULES.map((m) => {
+                const selected = active === m.id;
+                return (
+                  <Pressable
+                    key={m.id}
+                    onPress={() => {
+                      onSelect(m.id);
+                      onClose();
+                    }}
+                    style={[styles.drawerItem, { borderColor: theme.border }, selected && { backgroundColor: accent, borderColor: accent }]}
+                  >
+                    <View style={[styles.drawerDot, { backgroundColor: selected ? '#fff' : accent }]} />
+                    <Text style={[styles.drawerText, { color: selected ? '#fff' : theme.text }]}>{m.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+          <View style={[styles.drawerFooter, { borderTopColor: theme.border }]}>
+            <TouchableOpacity
+              style={[styles.drawerLogout, { borderColor: theme.border }]}
+              onPress={() => {
+                onClose();
+                onSignOut();
+              }}
+            >
+              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <Path d="M10 17l5-5-5-5M15 12H3M21 3v18" />
+              </Svg>
+              <Text style={[styles.drawerLogoutText, { color: theme.text }]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function Header({ active, onMenu }: { active: HaModuleId; onMenu: () => void }) {
+  const { user } = useAuth();
+  const { mode, theme, toggle } = useTheme();
+  const label = HA_MODULES.find((m) => m.id === active)?.label ?? 'Dashboard';
+  return (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <TouchableOpacity style={styles.headerIcon} onPress={onMenu}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.3} strokeLinecap="round">
+            <Path d="M4 6h16M4 12h16M4 18h16" />
+          </Svg>
+        </TouchableOpacity>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.brand}>Vexoo</Text>
+          <Text style={styles.headerSub}>Hospital Admin Portal</Text>
+        </View>
+        <TouchableOpacity style={styles.headerIcon} onPress={toggle}>
+          <Svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+            {mode === 'light' ? (
+              <>
+                <Path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.64 5.64l1.42 1.42M16.94 16.94l1.42 1.42M18.36 5.64l-1.42 1.42M7.06 16.94l-1.42 1.42" />
+                <Path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+              </>
+            ) : (
+              <Path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" />
+            )}
+          </Svg>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.hello}>Hi, {user?.name ?? 'Admin'}</Text>
+      <Text style={styles.headerTitle}>{label}</Text>
+      <Text style={[styles.headerBody, { color: theme.textMuted }]}>Full mobile workflow for hospital operations, clinical coordination, and administration.</Text>
+    </View>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
   );
 }
 
@@ -519,9 +779,19 @@ function Patients({ store, setStore, toast }: { store: Store; setStore: React.Di
   return (
     <>
       <Section title="Patients" action="New Patient" onAction={() => setShowNew(true)} />
+<<<<<<< HEAD
       <View style={styles.search}>
         <SearchField value={query} onChangeText={setQuery} placeholder="Search patients, ID, condition" accent={accent} />
       </View>
+=======
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search patients, ID, condition"
+        placeholderTextColor={theme.textMuted}
+        style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+      />
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
       {filtered.map((p) => (
         <Row key={p.id} title={p.name} subtitle={`${p.id} - ${p.age} yrs - ${p.condition}`} meta={`${p.doctor} - Last ${p.lastVisit}`} status={p.status} onPress={() => setSelected(p)} />
       ))}
@@ -551,9 +821,19 @@ function EMR({ store, toast }: { store: Store; toast: (m: string) => void }) {
   return (
     <>
       <Section title="Electronic Medical Records" action="Download PDF" onAction={() => toast(`Medical record PDF export simulated for ${patient.name}.`)} />
+<<<<<<< HEAD
       <View style={styles.search}>
         <SearchField value={query} onChangeText={setQuery} placeholder="Search by patient name, ID, or phone" accent={accent} />
       </View>
+=======
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search by patient name, ID, or phone"
+        placeholderTextColor={theme.textMuted}
+        style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+      />
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.patientStrip}>
         {filtered.map((p) => {
           const active = p.id === patient.id;
@@ -955,6 +1235,7 @@ function Inventory({
             <Stat label="Critical" value={String(store.inventory.filter((i) => i.status === 'Critical').length)} sub="immediate purchase" color={palette.rose} />
           </View>
           <Section title="Drug Inventory" action="Add Drug" onAction={() => openDrug()} />
+<<<<<<< HEAD
           <View style={styles.search}>
             <SearchField
               value={drugSearch}
@@ -967,6 +1248,19 @@ function Inventory({
             />
           </View>
           <Text style={[styles.note, { color: theme.textMuted }]}>Showing {pageItems.length} of {filteredInventory.length} medications. Page {safePage} of {totalPages}.</Text>
+=======
+          <TextInput
+            value={drugSearch}
+            onChangeText={(value) => {
+              setDrugSearch(value);
+              setDrugPage(1);
+            }}
+            placeholder="Search medications by name, category, or status"
+            placeholderTextColor={theme.textMuted}
+            style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+          />
+          <Text style={styles.note}>Showing {pageItems.length} of {filteredInventory.length} medications. Page {safePage} of {totalPages}.</Text>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
           {pageItems.map((i) => (
             <Card key={i.id}>
               <View style={styles.rowTopLine}>
@@ -1666,8 +1960,13 @@ function Settings({
                 </View>
                 {plan.features.map((feature) => (
                   <View key={feature} style={styles.planFeature}>
+<<<<<<< HEAD
                     <Icon name="check" size={14} color={accent} strokeWidth={2.6} />
                     <Text style={[styles.planFeatureText, { color: theme.textSecondary }]}>{feature}</Text>
+=======
+                    <Text style={styles.planFeatureMark}>OK</Text>
+                    <Text style={styles.planFeatureText}>{feature}</Text>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
                   </View>
                 ))}
                 {isCurrent ? (
@@ -1779,7 +2078,10 @@ export default function HospitalAdminPortalScreen() {
   const selectModule = (module: HaModuleId) => {
     setActive(module);
     scrollToTop();
+<<<<<<< HEAD
     pulseFor(420, 'Loading module');
+=======
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
   };
 
   const quickStats = useMemo(() => ({
@@ -1788,6 +2090,7 @@ export default function HospitalAdminPortalScreen() {
   }), [store.inventory, store.labs, store.notifications]);
 
   return (
+<<<<<<< HEAD
     <View style={[styles.safe, { backgroundColor: theme.bg }]}>
       <Header active={active} onMenu={() => setDrawerOpen(true)} />
       <Drawer open={drawerOpen} active={active} onClose={() => setDrawerOpen(false)} onSelect={selectModule} onSignOut={signOut} />
@@ -1798,21 +2101,38 @@ export default function HospitalAdminPortalScreen() {
           <Text style={[T.smallStrong, styles.alertBandText, { color: palette.rose }]}>
             {quickStats.alerts} unread alerts · {quickStats.critical} critical
           </Text>
+=======
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]} edges={['top']}>
+      <Header active={active} onMenu={() => setDrawerOpen(true)} />
+      <Drawer open={drawerOpen} active={active} onClose={() => setDrawerOpen(false)} onSelect={selectModule} onSignOut={signOut} />
+      <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.alertBand}>
+          <Text style={styles.alertBandText}>{quickStats.alerts} unread alerts - {quickStats.critical} critical operational items</Text>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
         </View>
         <ModuleBody active={active} store={store} setStore={setStore} go={selectModule} toast={showToast} scrollToTop={scrollToTop} />
       </ScrollView>
       {!!toast && (
+<<<<<<< HEAD
         <View style={[styles.toast, { backgroundColor: theme.text }]}>
           <Icon name="checkCircle" size={16} color={theme.bg} strokeWidth={2.2} />
           <Text style={[T.smallStrong, styles.toastText, { color: theme.bg }]}>{toast}</Text>
         </View>
       )}
     </View>
+=======
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      )}
+    </SafeAreaView>
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+<<<<<<< HEAD
   scroll: { flex: 1 },
   content: { paddingBottom: spacing.huge, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
 
@@ -1933,4 +2253,157 @@ const styles = StyleSheet.create({
 
   toast: { alignItems: 'center', borderRadius: radius.lg, bottom: 28, flexDirection: 'row', gap: spacing.sm, left: spacing.xl, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, position: 'absolute', right: spacing.xl },
   toastText: { flex: 1 },
+=======
+  header: { backgroundColor: palette.ink, paddingHorizontal: spacing.xxl, paddingBottom: spacing.xl, paddingTop: spacing.md },
+  headerTop: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  headerIcon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.md, height: 40, justifyContent: 'center', width: 40 },
+  headerIconText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  exitButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.md, height: 40, justifyContent: 'center', paddingHorizontal: spacing.md },
+  exitText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  brand: { color: '#fff', fontSize: fontSize.xl, fontWeight: fontWeight.heavy },
+  headerSub: { color: 'rgba(255,255,255,0.62)', fontSize: fontSize.xs, marginTop: 1 },
+  hello: { color: 'rgba(255,255,255,0.72)', fontSize: fontSize.sm, fontWeight: fontWeight.bold, marginTop: spacing.xl, textTransform: 'uppercase' },
+  headerTitle: { color: '#fff', fontSize: fontSize.h2, fontWeight: fontWeight.heavy, marginTop: spacing.xs },
+  headerBody: { fontSize: fontSize.sm, lineHeight: 19, marginTop: spacing.xs },
+  scroll: { flex: 1 },
+  content: { padding: spacing.xxl, paddingBottom: spacing.xxxl },
+  alertBand: { backgroundColor: palette.primaryLight, borderRadius: radius.lg, marginBottom: spacing.lg, padding: spacing.md },
+  alertBandText: { color: accent, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  drawerRoot: { flex: 1, flexDirection: 'row' },
+  drawerBackdrop: { backgroundColor: 'rgba(15,22,35,0.48)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  drawer: { borderRightWidth: 1, height: '100%', padding: spacing.xxl, width: 310 },
+  drawerKicker: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, textTransform: 'uppercase' },
+  drawerTitle: { fontSize: fontSize.xl, fontWeight: fontWeight.heavy, marginTop: spacing.xs },
+  drawerProfileCard: { alignItems: 'center', backgroundColor: '#eefaf7', borderRadius: radius.xl, flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg, padding: spacing.md },
+  drawerProfileName: { fontSize: fontSize.md, fontWeight: fontWeight.heavy, marginTop: spacing.xs },
+  drawerProfileRole: { fontSize: fontSize.xs, fontWeight: fontWeight.semibold, marginTop: 2 },
+  drawerAvatar: { alignItems: 'center', backgroundColor: accent, borderRadius: radius.md, height: 44, justifyContent: 'center', width: 44 },
+  drawerAvatarText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+  drawerScroll: { flex: 1, marginTop: spacing.md },
+  drawerItems: { gap: spacing.sm, marginTop: spacing.xl },
+  drawerItem: { alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.md },
+  drawerDot: { borderRadius: radius.pill, height: 9, width: 9 },
+  drawerText: { flex: 1, fontSize: fontSize.md, fontWeight: fontWeight.bold },
+  drawerFooter: { borderTopWidth: 1, marginTop: 'auto', paddingTop: spacing.lg },
+  drawerLogout: { alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.md },
+  drawerLogoutText: { flex: 1, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  stat: { borderRadius: radius.xl, borderWidth: 1, minHeight: 118, padding: spacing.lg, width: '47.9%' },
+  statBar: { borderRadius: radius.pill, height: 7, marginBottom: spacing.md, width: 24 },
+  statLabel: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, textTransform: 'uppercase' },
+  statValue: { fontSize: fontSize.xxl, fontWeight: fontWeight.heavy, marginTop: spacing.xs },
+  statSub: { fontSize: fontSize.sm, lineHeight: 17, marginTop: spacing.xs },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.md },
+  sectionRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md, marginTop: spacing.xxl },
+  sectionTitle: { fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+  sectionAction: { fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  card: { borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.md, padding: spacing.lg },
+  row: { alignItems: 'flex-start', borderRadius: radius.xl, borderWidth: 1, flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md, padding: spacing.lg },
+  rowTitle: { fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+  rowSub: { fontSize: fontSize.sm, lineHeight: 18, marginTop: spacing.xs },
+  rowMeta: { fontSize: fontSize.xs, fontWeight: fontWeight.semibold, marginTop: spacing.sm },
+  chip: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  chipText: { fontSize: fontSize.xxs, fontWeight: fontWeight.bold, textTransform: 'uppercase' },
+  button: { alignItems: 'center', borderRadius: radius.md, borderWidth: 1, justifyContent: 'center', minHeight: 42, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  buttonText: { fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  chartRow: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.md, height: 160, justifyContent: 'space-between' },
+  chartCol: { alignItems: 'center', flex: 1, justifyContent: 'flex-end' },
+  chartBar: { borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md, width: '80%' },
+  chartTiny: { color: palette.textMuted, fontSize: fontSize.xxs, fontWeight: fontWeight.bold, marginBottom: spacing.xs },
+  chartLabel: { color: palette.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.bold, marginTop: spacing.sm },
+  search: { borderRadius: radius.lg, borderWidth: 1, fontSize: fontSize.md, marginBottom: spacing.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  profileHead: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
+  avatar: { alignItems: 'center', borderRadius: radius.pill, height: 54, justifyContent: 'center', width: 54 },
+  avatarText: { fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+  profileName: { fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+  profileSub: { fontSize: fontSize.sm, marginTop: spacing.xs },
+  fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  field: { borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md, padding: spacing.md, width: '100%' },
+  fieldLabel: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, marginBottom: spacing.xs, textTransform: 'uppercase' },
+  fieldValue: { fontSize: fontSize.md, fontWeight: fontWeight.semibold, lineHeight: 20 },
+  paginationRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', marginBottom: spacing.md },
+  paginationText: { color: palette.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.heavy, minWidth: 54, textAlign: 'center' },
+  patientStrip: { gap: spacing.sm, paddingBottom: spacing.md },
+  patientPill: { borderRadius: radius.lg, borderWidth: 1, minWidth: 180, padding: spacing.md },
+  patientPillName: { fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+  patientPillSub: { fontSize: fontSize.xs, marginTop: spacing.xs },
+  weekBar: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between', marginBottom: spacing.md },
+  weekTitle: { color: palette.text, flex: 1, fontSize: fontSize.sm, fontWeight: fontWeight.heavy, textAlign: 'center' },
+  dayPill: { alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, minWidth: 82, padding: spacing.md },
+  dayName: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, textTransform: 'uppercase' },
+  dayNumber: { fontSize: fontSize.xl, fontWeight: fontWeight.heavy, marginTop: spacing.xs },
+  dayCount: { fontSize: fontSize.xs, fontWeight: fontWeight.semibold, marginTop: spacing.xs },
+  rowTopLine: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', marginBottom: spacing.md },
+  inlineTitle: { color: palette.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+  inlineSub: { color: palette.textMuted, fontSize: fontSize.sm, lineHeight: 18, marginTop: spacing.xs },
+  inputLabel: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, marginBottom: spacing.xs, textTransform: 'uppercase' },
+  input: { borderRadius: radius.lg, borderWidth: 1, fontSize: fontSize.md, minHeight: 44, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  inputMultiline: { minHeight: 96, textAlignVertical: 'top' },
+  segment: { borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md, padding: spacing.xs },
+  segmentItem: { borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  segmentText: { fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  settingsTabs: { borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md, padding: spacing.xs },
+  settingsTab: { alignItems: 'center', borderRadius: radius.md, flex: 1, minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.sm },
+  settingsTabText: { fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+  toggleList: { gap: spacing.sm, marginBottom: spacing.lg },
+  toggleItem: { alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 46, paddingHorizontal: spacing.md },
+  toggleMark: { fontSize: fontSize.xs, fontWeight: fontWeight.heavy, minWidth: 22 },
+  toggleText: { flex: 1, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  sheetRoot: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { backgroundColor: 'rgba(15,22,35,0.48)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  sheet: { borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, maxHeight: '88%' },
+  sheetHead: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', padding: spacing.xl },
+  sheetTitle: { fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+  sheetClose: { alignItems: 'center', borderRadius: radius.md, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
+  sheetCloseText: { fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  sheetBody: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  progressRow: { marginBottom: spacing.lg },
+  progressTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
+  progressName: { color: palette.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  progressCount: { color: palette.textMuted, fontSize: fontSize.sm },
+  progressTrack: { backgroundColor: palette.borderCool, borderRadius: radius.pill, height: 8, overflow: 'hidden' },
+  progressFill: { borderRadius: radius.pill, height: '100%' },
+  filterRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  reviewFilterSummary: { gap: spacing.sm, marginBottom: spacing.md },
+  note: { color: palette.textMuted, fontSize: fontSize.sm, lineHeight: 19, marginBottom: spacing.md },
+  billingHero: { alignItems: 'flex-start', backgroundColor: '#07110f', borderRadius: radius.xl, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginBottom: spacing.md, padding: spacing.xl },
+  billingEyebrow: { color: '#6ee7c8', fontSize: fontSize.xxs, fontWeight: fontWeight.heavy, letterSpacing: 0, marginBottom: spacing.sm, textTransform: 'uppercase' },
+  billingPlanRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  billingPlan: { color: '#fff', fontSize: fontSize.xxl, fontWeight: fontWeight.heavy },
+  billingStatusPill: { backgroundColor: '#ccfbef', borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  billingStatusText: { color: accent, fontSize: fontSize.xxs, fontWeight: fontWeight.heavy, textTransform: 'uppercase' },
+  billingMeta: { color: 'rgba(255,255,255,0.74)', fontSize: fontSize.sm, lineHeight: 19, marginTop: spacing.sm },
+  billingCancel: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.32)', borderRadius: radius.md, borderWidth: 1, minHeight: 40, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  billingCancelText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  billingRenew: { alignItems: 'center', backgroundColor: '#ccfbef', borderRadius: radius.md, minHeight: 40, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  billingRenewText: { color: accent, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  planCard: { backgroundColor: '#fff', borderColor: '#dde7e3', borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.md, padding: spacing.lg, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 14 },
+  planCardCurrent: { backgroundColor: '#e9fbf7', borderColor: accent, borderWidth: 2 },
+  planBadgeRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 22 },
+  planBadge: { backgroundColor: accent, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  planBadgeDark: { backgroundColor: palette.ink },
+  planBadgeText: { color: '#fff', fontSize: fontSize.xxs, fontWeight: fontWeight.heavy },
+  planName: { color: palette.text, fontSize: fontSize.lg, fontWeight: fontWeight.heavy, marginTop: spacing.md },
+  planPriceRow: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
+  planPrice: { color: '#111827', fontSize: fontSize.xxl, fontWeight: fontWeight.heavy },
+  planCadence: { color: palette.textMuted, fontSize: fontSize.sm, marginBottom: 4 },
+  planTag: { color: palette.textMuted, fontSize: fontSize.sm, lineHeight: 19, marginTop: spacing.sm },
+  planSeat: { backgroundColor: '#f6f7f6', borderColor: '#e0e5e2', borderRadius: radius.md, borderWidth: 1, marginTop: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  planSeatText: { color: palette.text, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
+  planFeature: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  planFeatureMark: { color: accent, fontSize: fontSize.xxs, fontWeight: fontWeight.heavy, width: 22 },
+  planFeatureText: { color: palette.text, flex: 1, fontSize: fontSize.sm, lineHeight: 18 },
+  planActionButton: { alignItems: 'center', backgroundColor: accent, borderRadius: radius.md, marginTop: spacing.lg, minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md },
+  planActionButtonText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+  planCurrentButton: { alignItems: 'center', backgroundColor: '#c9f4ea', borderRadius: radius.md, marginTop: spacing.lg, minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md },
+  planCurrentButtonText: { color: accent, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+  invoiceCard: { backgroundColor: '#fff', borderColor: '#dde7e3', borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.md, padding: spacing.lg },
+  invoiceTop: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', marginBottom: spacing.md },
+  invoiceId: { color: palette.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+  invoiceMeta: { color: palette.textMuted, fontSize: fontSize.sm, marginTop: spacing.xs },
+  invoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  invoiceDownload: { color: accent, fontSize: fontSize.sm, fontWeight: fontWeight.heavy, marginTop: spacing.sm },
+  toast: { alignSelf: 'center', backgroundColor: palette.ink, borderRadius: radius.pill, bottom: spacing.xl, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, position: 'absolute' },
+  toastText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+>>>>>>> 298e0ab2d1a2dca93b78290b1b3f3d4fc0fb18c2
 });

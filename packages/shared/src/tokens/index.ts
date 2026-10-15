@@ -6,3 +6,6 @@
 export * from './colors';
 export * from './typography';
 export * from './spacing';
+// Customer-facing products (Customer web + mobile) use a separate palette from
+// the clinic-ops portals. Both live here so tokens stay in one place.
+export * from './mineral';
